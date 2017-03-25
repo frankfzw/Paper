@@ -1,5 +1,6 @@
 \documentclass[10pt,twocolumn]{article}
 \usepackage{times}
+\usepackage{url}
 
 % do not change these values
 \baselineskip 12pt
@@ -12,191 +13,88 @@
 
 \begin{document}
 
-\title{ClaTex: LaTeX as a Service on the Cloud}
-\author{John Doe$^1$ and Jane Monroe$^2$ \\
-\small {\em  $^1$Dept. Cloud, Cloud University \quad
-          $^2$Cloud National Labs} \\ [2mm]
-\small Submission Type: Research
+\title{Title}
+\author{Zhouwang Fu$^1$ and Zhengwei Qi$^1$ \\
+% \small {\em  $^1$Shanghai Jiao Tong University \quad
+%           $^2$Cloud National Labs} \\ [2mm]
+\small {\em  $^1$Shanghai Jiao Tong University} \\ [2mm]
+% \small Submission Type: Research
 }
 \date{}
 \maketitle
 
 \begin{abstract}
-The time has come to offer LaTeX on the cloud.
+Shuffle is the term used to descirbe the cross-network read and aggregation
+of partitioned ancestor data before invoking reduce operation.
+As DAG computing framworks keep evolving, calculation and scheduling of each task are well optimized. 
+However shuffle cuts off the data processing pipeline, introduce significant latency to successors.
+To remove shuffle overhead, we present XXX, a plugin system to decouple shuffle from DAG computing 
+framework. XXX captures shuffle data in the memory and uses heuristic-FIFO scheduling to balance data
+blocks to elimite the explict barrier. We implement XXX and change Spark to use XXX as external shuffle 
+ service and scheduler. We evaluate XXX performance both on simulation and 50-machine Amazon EC2 cluster.
+ Results show that, by incorporating XXX in Spark, the shuffle overhead can be reduce XXX.
+
 \end{abstract}
 
 \section{Introduction}
 
-Here we introduce the key idea in the paper: to provide
-LaTeX as a service on the cloud.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
-minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-aliquip ex ea commodo consequat. Duis aute irure dolor in
-reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-culpa qui officia deserunt mollit anim id est laborum.
-
-
 \section{Motivation}
+In this section, we first study the shuffle pattern (\ref{shuffle pattern}). 
+Then we show the observation of the opportunities to optimize shuffle in \ref{observation}
+\subsection{Characteristic of Shuffle} \label{shuffle pattern}
+In DAG computing model such as Hadoop \cite{hadoop} and Spark \cite{spark}, shuffle is dedicated to achieve a
+all-to-all data tranfer between stages.
 
-Everyone uses LaTeX, everyone uses the cloud,
-therefore LaTeX on the cloud.
+It's I/O intensive, not CPU intensive. Write to disk for fault tolerance. Use network to transfer data. 
 
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem
-accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae
-ab illo inventore veritatis et quasi architecto beatae vitae dicta
-sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit
-aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos
-qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui
-dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed
-quia non numquam eius modi tempora incidunt ut labore et dolore magnam
-aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum
-exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex
-ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in
-ea voluptate velit esse quam nihil molestiae consequatur, vel illum
-qui dolorem eum fugiat quo voluptas nulla pariatur?
+It loosely couple with application context. Only blocks of bytes.
+\subsection{Observation} \label{observation}
+0. DAG computing have multi-rounds taks. Better load balance. Fit data blocks into main memory. 
+Example Hadoop MapReduce suggests 10-100 maps per-nodes and 0.95 to 1.75 multiplied by no.node * no.container per node.\cite{hadooptutorial}
+
+1. Disk is not necessary for fault tolerance. Memory is very fast, Network can be fast. Example SSD 480 MB/S max. 
+For 10Gbps network, 3X faster than SSD.
+
+2. It's not efficient to put shuffle read/write operation into a task. Task is a unit of computation. 
+But shuffle doesn't involve CPU
+
+3. Shuffle can be easly decoupled from task.
+Based on these observations, it's straightforward to come up with a optimization to overlap the I/O operation of shuffle
+by leveraging multi-rounds property of DAG computing. In order to achieve this optimization, we have to decouple shuffle and 
+perform pre-fetch as soon as each output of ancestor task is available. But is this feasible? We try to answer this question
+in the following sections.
+
+\section{Achieve Shuffle Pre-fetch}
+\subsection{Decouple shuffle from task}
+Instead of writing shuffle data into disk, the data can be intercepted in memory and directly writen to network.
+But where?
+\subsection{Pre-schedule with Application Context}
+Naively random map tasks to end hosts. It's bad, may skew. We have perform more balanced allocation to avoid hurting the performance of successor tasks.
+Show the simulation with open cloud trace. 
+
+In order to acheive better balanced allocation, we should combine with application context and DAG.
+
+For one shuffle, we can use first few tasks output to predict reduce distribution such as \cite{ishuffle}. 
+
+But results vary due to the input data distribution and partition function. Show three pics (hash parition and two range partition)
+
+For hash partition function, in most scenrios are enough to have first completed tasks.
+
+For range partition function and customed partition function, the relation between one output and the whole distribution can be oppsite.
+To avoid complex modification, we keep the partition function as a black box and use weighted reservior sampling to prob the distribution.
+Show the prediction result and accurance.
+
+For each prediction result, a percentage array of total data composition is calculated.
+
+Combined with DAG information, i.e. other co-existing shuffle dependencies.
+
+present pseudo code. (not completed yet).
 
 \section{Design}
-
-The design is easy: run LaTeX on the cloud.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
-minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-aliquip ex ea commodo consequat. Duis aute irure dolor in
-reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-culpa qui officia deserunt mollit anim id est laborum.
-
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem
-accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae
-ab illo inventore veritatis et quasi architecto beatae vitae dicta
-sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit
-aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos
-qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui
-dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed
-quia non numquam eius modi tempora incidunt ut labore et dolore magnam
-aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum
-exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex
-ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in
-ea voluptate velit esse quam nihil molestiae consequatur, vel illum
-qui dolorem eum fugiat quo voluptas nulla pariatur?
-
-At vero eos et accusamus et iusto odio dignissimos ducimus qui
-blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
-et quas molestias excepturi sint occaecati cupiditate non provident,
-similique sunt in culpa qui officia deserunt mollitia animi, id est
-laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita
-distinctio. Nam libero tempore, cum soluta nobis est eligendi optio
-cumque nihil impedit quo minus id quod maxime placeat facere possimus,
-omnis voluptas assumenda est, omnis dolor repellendus. Temporibus
-autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe
-eveniet ut et voluptates repudiandae sint et molestiae non
-recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut
-reiciendis voluptatibus maiores alias consequatur aut perferendis
-doloribus asperiores repellat.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
-minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-aliquip ex ea commodo consequat. Duis aute irure dolor in
-reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-culpa qui officia deserunt mollit anim id est laborum.
-
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem
-accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae
-ab illo inventore veritatis et quasi architecto beatae vitae dicta
-sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit
-aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos
-qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui
-dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed
-quia non numquam eius modi tempora incidunt ut labore et dolore magnam
-aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum
-exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex
-ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in
-ea voluptate velit esse quam nihil molestiae consequatur, vel illum
-qui dolorem eum fugiat quo voluptas nulla pariatur?
-
-At vero eos et accusamus et iusto odio dignissimos ducimus qui
-blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
-et quas molestias excepturi sint occaecati cupiditate non provident,
-similique sunt in culpa qui officia deserunt mollitia animi, id est
-laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita
-distinctio. Nam libero tempore, cum soluta nobis est eligendi optio
-cumque nihil impedit quo minus id quod maxime placeat facere possimus,
-omnis voluptas assumenda est, omnis dolor repellendus. Temporibus
-autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe
-eveniet ut et voluptates repudiandae sint et molestiae non
-recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut
-reiciendis voluptatibus maiores alias consequatur aut perferendis
-doloribus asperiores repellat.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
-minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-aliquip ex ea commodo consequat. Duis aute irure dolor in
-reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-culpa qui officia deserunt mollit anim id est laborum.
-
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem
-accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae
-ab illo inventore veritatis et quasi architecto beatae vitae dicta
-sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit
-aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos
-qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui
-dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed
-quia non numquam eius modi tempora incidunt ut labore et dolore magnam
-aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum
-exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex
-ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in
-ea voluptate velit esse quam nihil molestiae consequatur, vel illum
-qui dolorem eum fugiat quo voluptas nulla pariatur?
-
-At vero eos et accusamus et iusto odio dignissimos ducimus qui
-blanditiis praesentium voluptatum deleniti atque corrupti quos dolores
-et quas molestias excepturi sint occaecati cupiditate non provident,
-similique sunt in culpa qui officia deserunt mollitia animi, id est
-laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita
-distinctio. Nam libero tempore, cum soluta nobis est eligendi optio
-cumque nihil impedit quo minus id quod maxime placeat facere possimus,
-omnis voluptas assumenda est, omnis dolor repellendus. Temporibus
-autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe
-eveniet ut et voluptates repudiandae sint et molestiae non
-recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut
-reiciendis voluptatibus maiores alias consequatur aut perferendis
-doloribus asperiores repellat.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
-minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-aliquip ex ea commodo consequat. Duis aute irure dolor in
-reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-culpa qui officia deserunt mollit anim id est laborum.
-
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem
-accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae
-ab illo inventore veritatis et quasi architecto beatae vitae dicta
-sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit
-aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos
-qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui
-dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed
-quia non numquam eius modi tempora incidunt ut labore et dolore magnam
-aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum
-exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex
-ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in
-ea voluptate velit esse quam nihil molestiae consequatur, vel illum
-qui dolorem eum fugiat quo voluptas nulla pariatur?
+\section{Evaluation}
 
 \section{Conclusion}
 
-LaTeX works on the cloud, the cloud works with LaTeX.
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore.
 
 
 \bibliographystyle{abbrv}
