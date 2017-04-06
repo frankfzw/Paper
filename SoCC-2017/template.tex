@@ -15,6 +15,10 @@
 \usepackage{subcaption}
 \usepackage{color}
 \usepackage{float}
+\usepackage{amsmath}
+\usepackage{algorithm}
+% \usepackage{algorithmic}
+\usepackage[noend]{algpseudocode}
 
 \begin{document}
 
@@ -34,7 +38,7 @@ of partitioned ancestor data before invoking reduce operation.
 As DAG computing framworks keep evolving, calculation and scheduling of each task are well optimized. 
 However shuffle cuts off the data processing pipeline, introduce significant latency to successors.
 To remove shuffle overhead, we present XXX, a plugin system to decouple shuffle from DAG computing 
-framework. XXX captures shuffle data in the memory and uses heuristic-FIFO scheduling to balance data
+framework. XXX captures shuffle data in the memory and uses heuristic-MinHeap scheduling to balance data
 blocks to elimite the explict barrier. We implement XXX and change Spark to use XXX as external shuffle 
  service and scheduler. We evaluate XXX performance both on simulation and 50-machine Amazon EC2 cluster.
  Results show that, by incorporating XXX in Spark, the shuffle overhead can be reduce XXX.
@@ -91,7 +95,7 @@ When we look into the performance of disk and network in our test case, there is
 At the same time, the exclusive bandwidth of each instance is 750 Mbps\cite{aws}. In this case, the bottleneck of shuffle is disk, which introduces a significant latency for the application. Vice versa, in some cases, the congestion of network may also become the bolltle of shuffle\cite{varys}. The uncertainty of the I/O performance cause a huge challenge for optmizing the DAG computing in the cluster. For network latency, the most we can do is to mitigate the transfer delay. As for disk write, we believe it's not necessary for today's cluster. Recall that the persistence of shuffle data is used only for reduce fault tolerence, but mean time to failure(MTTF) for a server is counted in the scale of year\cite{tachyon}. In addition, we believe combing the high speed of network and memory is a better choice for fault tolerence. We will present more details in Section \ref{design}.
 
 \subsubsection{Shuffle size is small}\label{shufflesize}
-In order to accelearte computation, Spark will put all the input data set for a task into memroy. Comparing to the input dataset, size of shuffle data is relatively small. We persent to typical application on Spark to show the releationship between shuffle data comparing with the input dataset in Figure \ref{fig:shuffle_size}. Although TeraSort\cite{terasort} is known as a shuffle intensive job, in a 10GB input TeraSort, the shuffle size is less than 3GB. When it's mapped to a 5 nodes cluster, it only taks about 500MB memory (~25\% of input size for each node) to cache the shuffle data in memory. The data reported in \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as a factor of 5-10. This is another reason that disk should not be involved in the whole shuffle procedure.
+In order to accelearte computation, Spark will put all the input data set for a task into memroy. Comparing to the input dataset, size of shuffle data is relatively small. We persent to typical application on Spark to show the releationship between shuffle data comparing with the input dataset in Figure \ref{fig:shuffle_size}. Although TeraSort\cite{terasort} is known as a shuffle intensive job, in a 10GB input TeraSort, the shuffle size is less than 3GB. When it's mapped to a 5 nodes cluster, it only taks about 500MB memory (\~25\% of input size for each node) to cache the shuffle data in memory. The data reported in \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as a factor of 5-10. This is another reason that disk should not be involved in the whole shuffle procedure.
 
 
 Based on these observations, it's straightforward to come up with a optimization to use memory to store the shuffle data and overlap the I/O operations of shuffle
@@ -139,11 +143,92 @@ When the shuffle output blocks are available in memory, they can be pre-fetched 
 \end{figure*}
 Note that since most of the traces from OpenCloud is shuffle-light workload as showen in Figure \ref{fig:cdf}. The average shuffle read time is 0.6\% of total reduce completion time. So we will only use this trace to evalute the pre-scheduling and prediction schemes. 
 \subsubsection{Random Task-Node Mapping}
-The simplest way of pre-scheduling is mapping tasks to different nodes evenly. As shown in Figure \ref{fig:sim}, Random mapping works well when there is only one round of tasks in cluster. But multi-round in cluster is overwhleming according to Section \ref{multi}. The performance of random mapping collapses as the round number grows. After analyzing the trace, we find out that it's caused by data-skew. Reports in these papers\cite{skewtune, reining, gufler2012load} also claim that data-skew is commonly exist in data-parallel computing. When we apply a random mapping, it's probable to assign sevearl slow tasks on one node. The collision than slow down the the whole stage, which make the performance even worse than those without shuffle-prefetch. 
+The simplest way of pre-scheduling is mapping tasks to different nodes evenly. As shown in Figure \ref{fig:sim}, Random mapping works well when there is only one round of tasks in cluster. But multi-round in cluster is overwhleming according to Section \ref{multi}. The performance of random mapping collapses as the round number grows. After analyzing the trace, we find out that it's caused by data-skew. Reports in these papers\cite{skewtune, reining, gufler2012load} also claim that data-skew is commonly exist in data-parallel computing. When we apply a random mapping, it's probable to assign sevearl slow tasks on one node. The collision than slow down the the whole stage, which make the performance even worse than those without shuffle-prefetch. In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which can bring extra network traffic in cluster. 
 
 
-\subsubsection{Schedule with Heuristic}
-The failure of random mapping was obvious caused by application context (e.g. Shuffle input of each task) unawareness, which results in a heaver data skew. To avoid the 'bad' schedule results, we have to levrage the application context as assistance. The optimal schedule decision can be made under the awareness of shuffle dependecy number with input size for each task. But these data is unavialable when the pre-fetch starts. It's impossible to reach the optimal.
+\subsubsection{Shuffle Output Prediction}
+The failure of random mapping was obvious caused by application context (e.g. Shuffle input of each task) unawareness, which results in a heaver data skew. To avoid the 'bad' schedule results, we have to levrage the application context as assistance. The optimal schedule decision can be made under the awareness of shuffle dependecy number with input size for each task. But these data is unavialable when the pre-fetch starts. But the approximate size of each reduce task can be predicted using the prophase map output data can DAG context, so that the scheduling can achieve a more uniform load for each node.
+
+According to the DAG computing process, the shuffle size of each reduce task is decided by input data map task computation and hash partitioner. And for each map task, it will produce a data block for each reduce tasks, like '1-1' in Figure \ref{fig:shuffle}. '1-1' means it's produced by 'Map Task 1' for 'Reduce Task 1'. For Hadoop MapReduce, the shuffle input for each reduce task can be predicted with decent accuracy\cite{ishuffle}. They propose a liner regression model based on Verma et al.\cite{predict} that the ratio of map output size and input size is invariant given the same job configuration. Several map outputs (marked as Map Output in Figure \ref{fig:shuffle}) are picked as observation objects to train the model and than predict the final reduce distribution. But in the more sophisticated DAG computing framwork like Spark, this model can't fit. For instance, the reduce stage in Spark has more number of tasks that consume shuffle data instead of Hadoop MapReduce. More importantly, the customed partitioner can bring huge inconsistency between observed map output blocks distribution and the final reduce distribution, as we presented in Figure \ref{fig:dis}. We use different datasets with different partitioners to find the connection among three factors. We normalize threes sets of data to [0,1] to fit in one figure. In Figure \ref{fig:hash_pre}, we use a random input dataset with the Hash Partitioner of Spark\cite{sparksource}. In Figure \ref{fig:range_pre_sample}, we use a skew dataset with the Range Partitioner of Spark\cite{sparksource}.
+We randomly pick one observation map output and plot. As we can see, in hash partitioner, the distribution of each map(blue area) is close to the final reduce distribution(orange boxes). The prediction results also turns out well fitted. As we apply linear regression model to predict the final reduce distribuiton of Range Partitioner. The prediction is severely effected by the skew observed map output distribution. 
+
+To avoid this inconsistency in some cases, we introduce another methodology, weighted reservoir sampling, to mitigate this inconsistency. The classic reservoir samppling is designed for randomly chossing \textit{k} samples from \textit{n} items, where \textit{n} is either a very large or unknown number\cite{reservoir}. For each partition of data that produce shuffle output, we use reservoir sampling to randomly pick $s \times p$ of samples, where $p$ is the number of reduce tasks and $s$ is a tunable number. The number of input data partition and reduce tasks can be easily obtained when the from the DAG information. In Figure \ref{fig:range_pre_sample}, we set $s = 3$. Afther that, the map function is called locally to process the sampled data. As the 'Sampling' part showen in Figure \ref{fig:shuffle}, the final sampling map outputs are collected with the size of each parition of input data which is used as weight for each set of sample. For each reduce, the predicted size $reduceSize_i$
+
+\begin{equation} 
+\begin{aligned}
+	reduceSize_i = {\displaystyle\sum_{j=0}^{m} {partitionSize_j \times \frac{sample_i}{s \times p}}} \\ 
+	{\left( m = \text{partition number of input data} \right)}
+\end{aligned}
+\end{equation}
+As we can see in Figure \ref{fig:range_pre_sample}, the prediction result is much better even in a very skew scenario. The variance of the normalized data of sampling prediciton is because the strandard deviation of the prediction result is relatively small comparing to the average prediciton size, which is $0.0015$ in this example. Figure \ref{fig:prediction_relative_error} further prove that the sampling prediction can provide precise results even in the absoulte partition size of reduce tasks. On the oppsite, the result of linear regression comes out with huge relative error comparing with the fact of partition size of reduce tasks.
+
+But the sampling prediction may introduce a extral overhead in DAG computing process, we will evaluate the overhead in the Section \ref{evaluation}. Though in most cases, the overhead is negligible, but we won't use sampling for every reduce prediction. Combing with the DAG context, the sampling prediction will be triggered only when the range partitioner or customed partitioner occurs.
+
+\subsubsection{Heuristic MinHeap Scheduling of Single Shuffle}
+For each predicted reduce size, a percentage array of total data composition among each map output is calculated. This array can assist the scheduling to reduce the network traffic while acheiving the uniform load on each node. With this composition array and the predicted size of reduce, we present a heuristic MinHeap as the scheduling algorithem for single shuffle.
+\begin{minipage}{\linewidth}
+\begin{algorithm}[H]
+\caption{Heuristic MinHeap Scheduling for Single Shuffle}
+\label{hminheap}
+	\begin{algorithmic}[1]
+	\Procedure{doSchedule}{$maps, hosts, p\_reduces$}
+		\State $Reduces\gets$ sort\_by\_size$\left(p\_reduces\right)$
+		\State $Mapping\gets$ array$\left(\left[hostid, size, \left[r\_id\right], \left[s\_id\right]\right]\right)$
+		\State $tid\gets$ len$\left(Reduces\right)$
+		\While{$tid \geq 0$}
+		\Comment{Schedule redues by MinHeap}
+		\State $Mapping\left[0\right]\left[1\right] += Reduce\left[tid\right].size$
+		\State $Mapping\left[0\right]\left[2\right].append\left(Reduce\left[tid\right].r\_id\right)$
+		\State sift\_down$\left(Mapping\left[0\right]\right)$
+		\State $tid -= 1$
+		\EndWhile
+		\State $Mapping\gets$ sort\_by\_hostid$\left(Maping\right)$
+		\State $tid\gets$ len$\left(Reduces\right)$
+		\While{$tid \geq 0$}
+		\Comment{Heuristic swap by locality}
+		\State $prob\gets Reduces\left[tid\right].prob$
+		\State $nor\gets \left(prob-1/maps\right)/\left(1-1/maps\right)$
+		\State $t\_h\gets Reduces\left[tid\right].host$
+		\State $c\_h\gets$ current assigned host
+		\If{$t\_h == c\_h$}
+			\State $Mapping\left[t\_h\right]\left[2\right].remove\left(tid\right)$
+			\State $Mapping\left[t\_h\right]\left[3\right].append\left(tid\right)$
+		\ElsIf{$nor\geq$ rand$\left(0,1\right)$}
+			\State swap\_task$\left(tid, c\_h, t\_h\right)$
+		\Else
+			\State \text{\# Do nothing}
+		\EndIf
+		\State $tid -= 1$
+		\EndWhile
+		% \Comment{$m$ is the number of input data}
+		% \Comment{$r$ is partition number of reduces}
+		% \Comment{$hosts$ is array of (hostid, partitionids[], size)}
+		% \Comment{$c$ is $r*m$ array of composition data}
+		% \Comment{$pSize$ is $r$ size array of predicted size of reduces}
+		\ForAll{$item$ in $Mapping$}
+			\State combine$\left(item\left[2\right], item\left[3\right]\right)$
+		\EndFor
+		\Return $Mapping$
+	\EndProcedure
+	\Procedure{swap\_tasks}{$tid, c\_h, t\_h$}
+	\State Select $num$ tasks from $t\_h\left[2\right]$
+	\State that $total\_size$ in 
+	\State $\left(0.9*sizeof\left(tid\right), 1.1*sizeof\left(tid\right)\right)$
+	\If{$num == 0$}
+		\State return
+	\Else
+		\State \# Swap $nums$ of tasks to $c\_h\left[2\right]$
+		\State \# Swap $tid$ to $t\_h\left[3\right]$
+		\State \# Update size $t\_h\left[1\right]$ and $c\_h\left[1\right]$
+	\EndIf
+	\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+\end{minipage}
+
+Combined with DAG information, i.e. other co-existing shuffle dependencies.
+
+present pseudo code. (not completed yet).
 
 \begin{figure}
 	\centering
@@ -151,29 +236,6 @@ The failure of random mapping was obvious caused by application context (e.g. Sh
 	\caption{Shuffle Data Prediction}
 	\label{fig:shuffle}
 \end{figure}
-
-According to the DAG computing process, the shuffle size of each reduce task is decided by input data map task computation and hash partitioner. And for each map task, it will produce a data block for each reduce tasks, like '1-1' in Figure \ref{fig:shuffle}. '1-1' means it's produced by 'Map Task 1' for 'Reduce Task 1'. For Hadoop MapReduce, the shuffle input for each reduce task can be predicted with decent accuracy\cite{ishuffle}. They propose a liner regression model based on Verma et al.\cite{predict} that the ratio of map output size and input size is invariant given the same job configuration. Several map outputs (marked as Map Output in Figure \ref{fig:shuffle}) are picked as observation objects to train the model and than predict the final reduce distribution. But in the more sophisticated DAG computing framwork like Spark, this model can't fit. For instance, the reduce stage in Spark has more number of tasks that consume shuffle data instead of Hadoop MapReduce. More importantly, the customed partitioner can bring huge inconsistency between observed map output blocks distribution and the final reduce distribution, as we presented in Figure \ref{fig:dis}. We use different datasets with different partitioners to find the connection among three factors. We normalize threes sets of data to [0,1] to fit in one figure. In Figure \ref{fig:hash_pre}, we use a random input dataset with the Hash Partitioner of Spark\cite{sparksource}. In Figure \ref{fig:range_pre} and Figure \ref{fig:range_pre_sample}, we use a skew dataset with the Range Partitioner of Spark\cite{sparksource}.
-We randomly pick one observation map output and plot. As we can see, in hash partitioner, the distribution of each map(blue area) is close to the final reduce distribution(orange boxes). The prediction results also turns out well fitted. As we apply linear regression model to predict the final reduce distribuiton of Range Partitioner. The prediction is severely effected by the skew observed map output distribution. 
-
-To avoid this inconsistency in some cases, we introduce another methodology, weighted reservoir sampling, to mitigate this inconsistency. The classic reservoir samppling is designed for randomly chossing \textit{k} samples from \textit{n} items, where \textit{n} is either a very large or unknown number\cite{reservoir}. For each partition of data that produce shuffle output, we use reservoir sampling to randomly pick $s \times p$ of samples, where $p$ is the partition number of input data and $s$ is a tunable number. In Figure \ref{fig:range_pre_sample}, we set $s = 3$. Afther that, the map function is called locally to process the sampled data. As the 'Sampling' part showen in Figure \ref{fig:shuffle}, the final sampling map outputs are collected with the size of each parition of input data which is used as weight for each set of sample. For each reduce, the predicted size
-
-% \[ size_i = \displaystyle\sum_{j=0}^{m} size_j \times \left( \sfrach{num_i}{s \times p} \right) \]
-\[ size_i = \displaystyle\sum_{j=0}^{m} {partitionSize_j \times \frac{sample_i}{s \times p}} \]
-
-
-But results vary due to the input data distribution and partition function. Show three pics (hash parition and two range partition)
-
-For hash partition function, in most scenrios are enough to have first completed tasks.
-
-For range partition function and customed partition function, the relation between one output and the whole distribution can be oppsite.
-To avoid complex modification, we keep the partition function as a black box and use weighted reservior sampling to prob the distribution.
-Show the prediction result and accurance.
-
-For each prediction result, a percentage array of total data composition is calculated.
-
-Combined with DAG information, i.e. other co-existing shuffle dependencies.
-
-present pseudo code. (not completed yet).
 
 \begin{figure*}
 	\centering
@@ -183,21 +245,21 @@ present pseudo code. (not completed yet).
 		\label{fig:hash_pre}
 	\end{subfigure}
 	\begin{subfigure}[b]{0.32\linewidth}
-		\includegraphics[width=\linewidth]{fig/range_pre}
-		\caption{Linear Regression Prediction of Range Partitioner}
-		\label{fig:range_pre}
+		\includegraphics[width=\linewidth]{fig/range_pre_sample}
+		\caption{Linear Regression and Sampling Prediction of Range Partitioner}
+		\label{fig:range_pre_sample}
 	\end{subfigure}
 	\begin{subfigure}[b]{0.32\linewidth}
-		\includegraphics[width=\linewidth]{fig/range_pre_sample}
-		\caption{Sampling Prediction of Range Partitioner}
-		\label{fig:range_pre_sample}
+		\includegraphics[width=\linewidth]{fig/prediction_relative_error}
+		\caption{Prediction Relative Error of Range Partitioner}
+		\label{fig:prediction_relative_error}
 	\end{subfigure}
 	\caption{Reduction Distribution Prediction}
 	\label{fig:dis}
 \end{figure*}
 
 \section{Design}\label{design}
-\section{Evaluation}
+\section{Evaluation}\label{evaluation}
 
 \section{Conclusion}
 
