@@ -33,6 +33,7 @@
 \maketitle
 
 \begin{abstract}
+
 Shuffle is the term used to descirbe the cross-network read and aggregation
 of partitioned ancestor data before invoking reduce operation.
 As DAG computing framworks keep evolving, calculation and scheduling of each task are well optimized. 
@@ -48,6 +49,7 @@ blocks to elimite the explict barrier. We implement XXX and change Spark to use 
 \section{Introduction}
 
 \section{Motivation}
+
 In this section, we first study the shuffle pattern (\ref{shuffle pattern}) . 
 Then we show the observations of the opportunities to optimize shuffle in \ref{observation}
 \subsection{Characteristic of Shuffle} \label{shuffle pattern}
@@ -55,13 +57,13 @@ Then we show the observations of the opportunities to optimize shuffle in \ref{o
 In large scale data parallel computing, enormous datasets are partitioned into pieces to fit the memory of each node since the very beginnig of MapReduce\cite{mapreduce}.
 Meanwhile, complicated application procedures are divided into steps. The successor steps take the output of ancestors as input to do the computation. Shuffle occurs when each successor needs 
 part of data from all ancestors' output. In order to provide a clear illustration, we define those computing each partition of data in one step as task. For tasks that generates shuffle output, we call
-them map task. For tasks that consume shuffle output, we call them reudce tasks. Note that one task may have both shuffle data generation and consumption, we call it intermediate task.
+them map task. For tasks that consume shuffle output, we call them reudce tasks. Note that one task may have both shuffle data generation and consumption in mordern DAG framework. These tasks contains characteristic of both map task and reduce task. But these tasks won't change the behavior of shuffle. To avoid ambiguity, in the following paper, we will only use term of map task to represent those who produce shuffle output, and reduce task to represent those who consume shuffle output.
 
 Shuffle is designed to achieve an all-to-all data blocks transfer among nodes in cluster. It exists in both MapReduce models and DAG computation models.
 
-Shuffle mainly contains two phases itself: \textbf{Data Partition} and \textbf{Data Transfer}. For \textbf{Data Partition}, each map task and intermediate task will partition the result data (key, value pair) into several buckets according to the partition function.
-The buckets number equals to the number of tasks in the next step. When the map tasks and intermediate tasks finish, all the shuffle output data will be written into local persistent storage for fault tolerance \cite{mapreduce, spark}.
-\textbf{Data Transfer} can be further divied into two parts: \textbf{Shuffle Write} and \textbf{Shuffle Read}. \textbf{Shuffle Write} starts after execution of map tasks and intermediate tasks. Partitioned data will  be stored on disk during \textbf{Shuffle Write}. \textbf{Shuffle Read} starts at the beginning of reduce tasks and intermediate tasks. These tasks will fetch the data that belongs to their corresponding partitions from both remote nodes and local storage.
+The overview process of shuffle is presented in Firgure \ref{fig:shuffle_process}. Shuffle mainly contains two phases itself: \textbf{Data Partition} and \textbf{Data Transfer}. For \textbf{Data Partition}, each map task will partition the result data (key, value pair) into several buckets according to the partition function.
+The buckets number equals to the number of tasks in the next step. When the map tasks finish, all the shuffle output data will be written into local persistent storage for fault tolerance \cite{mapreduce, spark}.
+\textbf{Data Transfer} can be further divied into two parts: \textbf{Shuffle Write} and \textbf{Shuffle Read}. \textbf{Shuffle Write} starts after execution of map tasks and intermediate tasks. Partitioned data will  be stored on disk during \textbf{Shuffle Write}. \textbf{Shuffle Read} starts at the beginning of reduce tasks tasks. These tasks will fetch the data that belongs to their corresponding partitions from both remote nodes and local storage.
 
 In short, shuffle is loosely coupled with application context and it's I/O intensive.
 
@@ -70,6 +72,12 @@ and 20\% at Facebook are shuffle intensive workloads\cite{shufflewatcher}. For t
 For instance, a MapReduce trace analysis from Facebook shows that shuffle accounts for 33\% JCT on average, up to 70\% in shuffle intensive jobs\cite{managing}.
 Meanwhile, the completion time of shuffle correlates with the performance of storage devices, network and even applications. 
 This variation may bring a huge challenge for operators to find the correct configuration of the DAG framework.
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{fig/shuffle_process}
+	\caption{Shuffle Overview}
+	\label{fig:shuffle_process}
+\end{figure}
 
 \subsection{Observations} \label{observation}
 Of course, shuffle is unavoidable in a DAG computing process. But \textit{can we mitigate or even remove the overhead of shuffle?} To find the answers, we run some representative applications on a Spark in a 5 m4.xlarge Aamzon EC2 cluster. We than capture and plot the CPU utilization, I/O throughput and tasks execution information on each node. Take the trace in Figure \ref{fig:util} as an example, which is caputured during one Spark GroupByTest job. This job has 2 rounds of tasks for each node. We mark the 'Execution' phase in the figure from the launch time of the first task on this node to the execution finish timestamp of the last one. The 'Shuffle Write' phase is marked from the timestamp of the begining of the first partitioned data write. The 'Shuffle Read and Execution' phase is mark from the start of the first reduce launch timestamp.
@@ -92,7 +100,7 @@ But CPU becomes idle almost as soon as the 'Exectuion' is finished. On the other
 
 \subsubsection{I/O performance varys}
 When we look into the performance of disk and network in our test case, there is huge variance. Since we use the standard EBS as our backend storage for the EC2 instances, the I/O performance of disk is poor. 
-At the same time, the exclusive bandwidth of each instance is 750 Mbps\cite{aws}. In this case, the bottleneck of shuffle is disk, which introduces a significant latency for the application. Vice versa, in some cases, the congestion of network may also become the bolltle of shuffle\cite{varys}. The uncertainty of the I/O performance cause a huge challenge for optmizing the DAG computing in the cluster. For network latency, the most we can do is to mitigate the transfer delay. As for disk write, we believe it's not necessary for today's cluster. Recall that the persistence of shuffle data is used only for reduce fault tolerence, but mean time to failure(MTTF) for a server is counted in the scale of year\cite{tachyon}. In addition, we believe combing the high speed of network and memory is a better choice for fault tolerence. We will present more details in Section \ref{design}.
+At the same time, the exclusive bandwidth of each instance is 750 Mbps\cite{aws}. In this case, the bottleneck of shuffle is disk, which introduces a significant latency for the application. Vice versa, in some cases, the congestion of network may also become the bolltle of shuffle\cite{varys}. The uncertainty of the I/O performance cause a huge challenge for optmizing the DAG computing in the cluster. For network latency, the most we can do is to mitigate the transfer delay. As for disk write, we believe it's not necessary for today's cluster. Recall that the persistence of shuffle data is used only for reduce fault tolerence, but mean time to failure(MTTF) for a server is counted in the scale of year\cite{tachyon}. In addition, we believe combing the high speed of network and memory is a better choice for fault tolerence. We will present more details in Section \ref{impl}.
 
 \subsubsection{Shuffle size is small}\label{shufflesize}
 In order to accelearte computation, Spark will put all the input data set for a task into memroy. Comparing to the input dataset, size of shuffle data is relatively small. We persent to typical application on Spark to show the releationship between shuffle data comparing with the input dataset in Figure \ref{fig:shuffle_size}. Although TeraSort\cite{terasort} is known as a shuffle intensive job, in a 10GB input TeraSort, the shuffle size is less than 3GB. When it's mapped to a 5 nodes cluster, it only taks about 500MB memory (\~25\% of input size for each node) to cache the shuffle data in memory. The data reported in \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as a factor of 5-10. This is another reason that disk should not be involved in the whole shuffle procedure.
@@ -146,8 +154,8 @@ Note that since most of the traces from OpenCloud is shuffle-light workload as s
 The simplest way of pre-scheduling is mapping tasks to different nodes evenly. As shown in Figure \ref{fig:sim}, Random mapping works well when there is only one round of tasks in cluster. But multi-round in cluster is overwhleming according to Section \ref{multi}. The performance of random mapping collapses as the round number grows. After analyzing the trace, we find out that it's caused by data-skew. Reports in these papers\cite{skewtune, reining, gufler2012load} also claim that data-skew is commonly exist in data-parallel computing. When we apply a random mapping, it's probable to assign sevearl slow tasks on one node. The collision than slow down the the whole stage, which make the performance even worse than those without shuffle-prefetch. In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which can bring extra network traffic in cluster. 
 
 
-\subsubsection{Shuffle Output Prediction}
-The failure of random mapping was obvious caused by application context (e.g. Shuffle input of each task) unawareness, which results in a heaver data skew. To avoid the 'bad' schedule results, we have to levrage the application context as assistance. The optimal schedule decision can be made under the awareness of shuffle dependecy number with input size for each task. But these data is unavialable when the pre-fetch starts. But the approximate size of each reduce task can be predicted using the prophase map output data can DAG context, so that the scheduling can achieve a more uniform load for each node.
+\subsubsection{Shuffle Output Prediction}\label{shuffleprediction}
+The failure of random mapping was obvious caused by application context (e.g. Shuffle input of each task) unawareness, which results in a heaver data skew. To avoid the 'bad' schedule results, we have to levrage the application context as assistance. The optimal schedule decision can be made under the awareness of shuffle dependecy number with input size for each task. unfortunately these data is unavialable when the pre-fetch starts. But the approximate size of each reduce task can be predicted using the prophase map output data with DAG context, so that the scheduling can approaching a more uniform load for each node.
 
 According to the DAG computing process, the shuffle size of each reduce task is decided by input data, map task computation and hash partitioner. And for each map task, it will produce a data block for each reduce tasks, like '1-1' in Figure \ref{fig:shuffle}. '1-1' means it's produced by 'Map Task 1' for 'Reduce Task 1'. For Hadoop MapReduce, the shuffle input for each reduce task can be predicted with decent accuracy\cite{ishuffle}. They propose a liner regression model based on Verma et al.\cite{predict} that the ratio of map output size and input size is invariant given the same job configuration. Several map outputs (marked as Map Output in Figure \ref{fig:shuffle}) are picked as observation objects to train the model and than predict the final reduce distribution. But in the more sophisticated DAG computing framwork like Spark, this model can't fit. For instance, the reduce stage in Spark has more number of tasks that consume shuffle data instead of Hadoop MapReduce. More importantly, the customed partitioner can bring huge inconsistency between observed map output blocks distribution and the final reduce distribution, as we presented in Figure \ref{fig:dis}. We use different datasets with different partitioners to find the connection among three factors. We normalize threes sets of data to [0,1] to fit in one figure. In Figure \ref{fig:hash_pre}, we use a random input dataset with the Hash Partitioner of Spark\cite{sparksource}. In Figure \ref{fig:range_pre_sample}, we use a skew dataset with the Range Partitioner of Spark\cite{sparksource}.
 We randomly pick one observation map output and plot. As we can see, in hash partitioner, the distribution of each map(blue area) is close to the final reduce distribution(orange boxes). The prediction results also turns out well fitted. As we apply linear regression model to predict the final reduce distribuiton of Range Partitioner. The prediction is severely effected by the skew observed map output distribution. 
@@ -161,75 +169,74 @@ To avoid this inconsistency in some cases, we introduce another methodology, wei
 \end{aligned}
 \end{equation}
 As we can see in Figure \ref{fig:range_pre_sample}, the prediction result is much better even in a very skew scenario. The variance of the normalized data of sampling prediciton is because the strandard deviation of the prediction result is relatively small comparing to the average prediciton size, which is $0.0015$ in this example. Figure \ref{fig:prediction_relative_error} further prove that the sampling prediction can provide precise results even in the absoulte partition size of reduce tasks. On the oppsite, the result of linear regression comes out with huge relative error comparing with the fact of partition size of reduce tasks.
-
-But the sampling prediction may introduce a extral overhead in DAG computing process, we will evaluate the overhead in the Section \ref{evaluation}. Though in most cases, the overhead is negligible, but we won't use sampling for every reduce prediction. Combing with the DAG context, the sampling prediction will be triggered only when the range partitioner or customed partitioner occurs.
-
-\subsubsection{Heuristic MinHeap Scheduling of Single Shuffle}
-For each predicted reduce size, a percentage array of total data composition among each map output is calculated. The highest percentage and it's corresponding host shoudle be the best choice the dimension of locality. In order to achieve the uniform load on each node while reducing the network traffic and shuffle transmission time. With this composition array and the predicted size of reduce, we present a heuristic MinHeap as the scheduling algorithm for single shuffle.
 \begin{minipage}{\linewidth}
 \begin{algorithm}[H]
 \caption{Heuristic MinHeap Scheduling for Single Shuffle}
 \label{hminheap}
 	\begin{algorithmic}[1]
-	\Procedure{doSchedule}{$maps, hosts, p\_reduces$}
-		\State $Reduces\gets$ sort\_by\_size$\left(p\_reduces\right)$
-		\State $Mapping\gets$ array$\left(\left[hostid, size, \left[r\_id\right], \left[s\_id\right]\right]\right)$
-		\State $tid\gets$ len$\left(Reduces\right)$
-		\While{$tid \geq 0$}
+	\small
+	\Procedure{schedule}{$m, h, p\_reduces$}
+		\State $R\gets$ sort $p\_reduces$ by size
+		\State $M\gets$ mapping of host id in $h$ to reduce id and size
+		\State $rid\gets$ len$\left(R\right)$
+		\Comment{Current scheduled reduce id}
+		\While{$rid \geq 0$}
 		\Comment{Schedule redues by MinHeap}
-		\State $Mapping\left[0\right]\left[1\right] += Reduce\left[tid\right].size$
-		\State $Mapping\left[0\right]\left[2\right].append\left(Reduce\left[tid\right].r\_id\right)$
-		\State sift\_down$\left(Mapping\left[0\right]\right)$
-		\State $tid -= 1$
+		\State Update $M\left[0\right].size$
+		\State Assign $rid$ to $M\left[0\right]$
+		\State sift\_down$\left(M\left[0\right]\right)$
+		\State
+		\Comment{Use min-heap according to size in $M$}
+		\State $rid\gets rid-1$
 		\EndWhile
-		\State $Mapping\gets$ sort\_by\_hostid$\left(Maping\right)$
-		\State $tid\gets$ len$\left(Reduces\right)$
-		\While{$tid \geq 0$}
+		\State $max\gets$ maximum size in $M$
+		\State $rid\gets$ len$\left(R\right)$
+		\While{$rid \geq 0$}
 		\Comment{Heuristic swap by locality}
-		\State $prob\gets Reduces\left[tid\right].prob$
-		\State $nor\gets \left(prob-1/maps\right)/\left(1-1/maps\right)$
-		\State $t\_h\gets Reduces\left[tid\right].host$
-		\State $c\_h\gets$ current assigned host
+		\State $prob\gets$ max composition portion of $rid$
+		\State $nor\gets \left(prob-1/m\right)/\left(1-1/m\right)/10$
+		\State
+		\Comment{Use $nor$ to limit the performance degradation in tasks swap}
+		\State $t\_h\gets$ host that produces $prob$ data of $rid$
+		\State $c\_h\gets$ current assigned host by MinHeap
 		\If{$t\_h == c\_h$}
-			\State $Mapping\left[t\_h\right]\left[2\right].remove\left(tid\right)$
-			\State $Mapping\left[t\_h\right]\left[3\right].append\left(tid\right)$
-		\ElsIf{$nor\geq$ rand$\left(0,1\right)$}
-			\State swap\_task$\left(tid, c\_h, t\_h\right)$
+			\State Seal the assignment of $rid$ in $M$
 		\Else
-			\State \text{\# Do nothing}
+			\State swap\_tasks$\left(rid, c\_h, t\_h, max, nor\right)$
 		\EndIf
-		\State $tid -= 1$
+		\State $rid\gets rid-1$
 		\EndWhile
 		% \Comment{$m$ is the number of input data}
 		% \Comment{$r$ is partition number of reduces}
 		% \Comment{$hosts$ is array of (hostid, partitionids[], size)}
 		% \Comment{$c$ is $r*m$ array of composition data}
 		% \Comment{$pSize$ is $r$ size array of predicted size of reduces}
-		\ForAll{$item$ in $Mapping$}
-			\State combine$\left(item\left[2\right], item\left[3\right]\right)$
-		\EndFor
-		\Return $Mapping$
+		\Return $M$
 	\EndProcedure
-	\Procedure{swap\_tasks}{$tid, c\_h, t\_h$}
-	\State Select $num$ tasks from $t\_h\left[2\right]$
-	\State that $total\_size$ in 
-	\State $\left(0.9*sizeof\left(tid\right), 1.1*sizeof\left(tid\right)\right)$
+	\Procedure{swap\_tasks}{$rid, c\_h, t\_h, max, nor$}
+	\State $num\gets$ number of reduces 
+	\State selected from $t\_h$ that $total\_size$ won't
+	\State make both $c\_h$ and $t\_h$ exceed $\left(1+nor\right)*max$
+	\State after swapping
 	\If{$num == 0$}
 		\State return
 	\Else
-		\State \# Swap $nums$ of tasks to $c\_h\left[2\right]$
-		\State \# Swap $tid$ to $t\_h\left[3\right]$
-		\State \# Update size $t\_h\left[1\right]$ and $c\_h\left[1\right]$
+		\State \# Swap $nums$ of reduces with $rid$ between $c\_h$ and $t\_h$
+		\State \# Update size of $t\_h$ and $c\_h$
 	\EndIf
 	\EndProcedure
 	\end{algorithmic}
 \end{algorithm}
 \end{minipage}
-This algorithm can be divided into two round of scheduling. For input of $doSchedule$, $maps$ is the partition number of input data, $hosts$ is the number of nodes in cluster and $p\_reduces$ is the predicted reduce matrix. Each row in $p\_reduces$ contains $r\_id$ as reduce partition ID, $size$ as predicted size of this partition, $prob$ as the maximum portion of reduce data, and $host$ as the node ID that produce the maximum portion of reduce data. As for $Mapping$, it's a matrix consists $hostid$, $size$(total size of reduce data on this node), $r\_id array$ (array to store the reduce ID of fisrt round scheduling) and $s\_id array$(arrary to store the reduce ID of sccond round of scheduling). 
 
-In the first round (i.e. The first while in Alogorithm \ref{hminheap}), the reduces are first sorted by size. And then, they are assigned to hosts in the decending order of size . For hosts, we use a min-heap to maintain the hosts array according to the scheduled size on each hosts. In other word, the heavy tasks can be distributed evenly in the cluster.  After the scheduling, the completion time of reduce stage is close to the optimal. \textcolor{red}{may need to add math prove between this and optimal}. In the second round, the task-host mapping will be adjusted according to the locality. For a task which contains at most $prob$ data from $host$, the normalized probabilty of swap is calculate. This normalization is used to prevent meaningless swap, since if the $prob$ is close to $1/maps$, the composition of this reduce is evenly distributed in cluster. If the assigned host is not equalt to the $host$, than it has the $nor$ probality to trigger a tasks swap between to hosts. To maintain the scheduling mapping of first round, the tasks will only be swaped if the target hosts owns a set of tasks that has simmilar size totally. We use the OpenCloud\cite{opencloudtrace} trace to evaluate Heuristic MinHeap. Without swapping, the Heuristic MinHeap can acheieve better performance improvement (average 5.7\%) than the default Spark FIFO scheduling algorithm (average 2.7\%). In the case of extream skew scenario, such as Figure \ref{fig:range_pre_sample}, Heuristic MinHeap trades about 0.05\% percent of stage completion time for 99\% reduction of shuffle data transmission through network by heruisticaly swapping tasks.
+But the sampling prediction may introduce a extral overhead in DAG computing process, we will evaluate the overhead in the Section \ref{evaluation}. Though in most cases, the overhead is negligible, but we won't use sampling for every reduce prediction. Combing with the DAG context, the sampling prediction will be triggered only when the range partitioner or customed partitioner occurs.
 
-Combined with DAG information, i.e. other co-existing shuffle dependencies.
+\subsubsection{Heuristic MinHeap Scheduling of Single Shuffle}\label{h-minheap}
+For each predicted reduce size, a percentage array of total data composition among each map output is calculated. The highest percentage and it's corresponding host shoudle be the best choice the dimension of locality. In order to achieve the uniform load on each node while reducing the network traffic and shuffle transmission time. With this composition array and the predicted size of reduce, we present a heuristic MinHeap as the scheduling algorithm for single shuffle.
+
+This algorithm can be divided into two round of scheduling. For input of $schedule$, $m$ is the partition number of input data, $h$ is the array of nodes ID in cluster and $p\_reduces$ is the predicted reduce matrix. Each row in $p\_reduces$ contains $r\_id$ as reduce partition ID, $size$ as predicted size of this partition, $prob$ as the maximum composition portion of reduce data, and $host$ as the node ID that produce the maximum portion of reduce data. As for $M$, it's a matrix consists $hostid$, $size$(total size of reduce data on this node) and an array of reduce id. 
+
+In the first round (i.e. The first while in Alogorithm \ref{hminheap}), the reduces are first sorted by size. And then, they are assigned to hosts in the decending order of size . For hosts, we use a min-heap to maintain the hosts array according to the scheduled size on each hosts. In other word, the heavy tasks can be distributed evenly in the cluster.  After the scheduling, the completion time of reduce stage is close to the optimal. \textcolor{red}{may need to add math prove between this and optimal}. In the second round, the task-host mapping will be adjusted according to the locality. The closer $prob$ is to $1/m$, the more evenly this reduce is distributed in cluster. For a task which contains at most $prob$ data from $host$, the normalized probabilty $nor$ is calculated as a bound of performance degradation. This normalization can ensure that the more performance can be traded when the locality level increases. But the degradation of performance will not exceed 10\% since the maximum value of nor is 0.1 (in extream skew scenarios).  If the assigned host($c\_h$ in algorithm \ref{hminheap}) is not equal to the $host$ ($t\_h$ in algorithm \ref{hminheap}), than it has the $nor$ probality to trigger a tasks swap between two hosts. To maintain the scheduling mapping of first round, the tasks will only be swaped if the target hosts owns a set of tasks that has simmilar size totally. We use the OpenCloud\cite{opencloudtrace} trace to evaluate Heuristic MinHeap. Without swapping, the Heuristic MinHeap can acheieve a better performance improvement (average 5.7\%) than the default Spark FIFO scheduling algorithm (average 2.7\%). In the case of extream skew scenario, such as Figure \ref{fig:range_pre_sample}, Heuristic MinHeap trades about 0.05\% percent of stage completion time for 99\% reduction of shuffle data transmission through network by heruisticaly swapping tasks.
 
 \begin{figure}
 	\centering
@@ -258,8 +265,50 @@ Combined with DAG information, i.e. other co-existing shuffle dependencies.
 	\caption{Reduction Distribution Prediction}
 	\label{fig:dis}
 \end{figure*}
+\subsubsection{Cope with Multiple Shuffles}
+Unlike Hadoop MapReduce, multiple shuffles commonly exist in DAG computing. The techniques mention in Section \ref{shuffleprediction} can only predict the ongoing shuffle. For those pending shuffle, it's impossible to predict their size because of lacking either observed map outputs or sampling data. Let all tasks of all shuffle to be scheduled by DAG framework simultaneously can relieve the dilemma. But huge modification in DAG framework should be made by doing this. For example, Spark only supports one stage running at the same time for one application. To avoid this redundant workload, we provide the accumlating scheduling to cope with multiple shuffles.
+\begin{minipage}{\linewidth}
+\begin{algorithm}[H]
+\caption{Accumulate Scheduling for Multi-Shuffles}
+\label{mhminheap}
+	\begin{algorithmic}[1]
+	\small
+	\Procedure{mSchedule}{$m, h, p\_reduces, shuffles$}
+		\State
+		\Comment $shuffles$ is the previous array of reduce partition ID, host ID and size
+		\ForAll{$r\_id$ in $p\_reduces$}
+		\State $p\_reduce\left[r\_id\right].size\gets p\_reduce\left[r\_id\right].size + shuffles\left[r\_id\right].size$
+		\If{$shuffles\left[r\_id\right].size\geq p\_reduce\left[r\_id\right].size * p\_reduce\left[r\_id\right].prob$}
+		\State Update $prob$ set $host$ to $shuffles\left[r\_id\right].host$
+		\EndIf
+		\EndFor
+		\State $M\gets$ schedule$\left(m, h, p\_reduecs\right)$
+		\ForAll{$host$ in $M$}
+			\ForAll{$r\_id$ in $host$}
+				\If{$host\neq shuffles\left[r\_id\right].host$}
+				\State Re-shuffle data to $host$
+				\State $shuffles\left[r\_id\right].host\gets host$
+				\EndIf
+			\EndFor
+		\EndFor
+		\Return $M$
+	\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+\end{minipage}
 
-\section{Design}\label{design}
+When a new shuffle start, the $mSchedule$ is called to schedule the current shuffle with previous $shuffles$. The size of reduce on each node of previous scheduled $shuffles$ are counted. Combined the with the predicted reduces size of current shuffle in $p\_reduces$, the $size$ of each reduce and its corresponding $porb$ and $host$ are updated accumulately. Then the $schedule$ is called to perform the shuffle scheduling. When the new host-reduce mapping is available, for each reduce task, if the new scheduled host in $M$ is not equle to the origin one, the re-shuffle will be triggered to transfer data to new scheduled host for further computing. This re-shuffle can be rare since the previous shuffled data in one reduce contributes a huge compostion while doing the accumulate updating. It means in the schedule phase, the $swap-task$ can help revise the scheduling to match the previous mapping in $shuffles$ as mucn as possible while maintaining the good performance.
+
+\section{Implementation}\label{impl}
+This section overviews the implementation of SCache -- a distributed in-memory storage system that caches shuffle data of DAG framework. Here we use Spark as example of DAG framwork to illustrate working process of shuffle optimization. We will first present system architecture in Subsection \ref{arch} while the following two subsections focuss on the two main challenges: memory manangement and fault tolerence.
+\subsection{System Architecture}\label{arch}
+SCache consists mainly two components: A distributed in-memory shuffle data storage system and the daemon inside Spark Client and Master. As shown in Figure \ref{fig:arch}, for the in-memory storage system, SCache employs the legacy master-slaves architecture like GFS\cite{gfs}.
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{fig/arch}
+	\caption{SCache Architecture}
+	\label{fig:arch}
+\end{figure}
 \section{Evaluation}\label{evaluation}
 
 \section{Conclusion}
