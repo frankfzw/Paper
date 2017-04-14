@@ -302,7 +302,7 @@ When a new shuffle start, the $mSchedule$ is called to schedule the current shuf
 \section{Implementation}\label{impl}
 This section overviews the implementation of SCache -- a distributed in-memory storage system that caches shuffle data of DAG framework. Here we use Spark as example of DAG framwork to illustrate working process of shuffle optimization. We will first present system architecture in Subsection \ref{arch} while the following two subsections focuss on the two main challenges: memory manangement and fault tolerence.
 \subsection{System Architecture}\label{arch}
-SCache consists mainly two components: A distributed in-memory shuffle data storage system and the daemon inside Spark Client and Master. As shown in Figure \ref{fig:arch}, for the in-memory storage system, SCache employs the legacy master-slaves architecture like GFS\cite{gfs}.
+SCache consists mainly two components: A distributed in-memory shuffle data storage system and the daemon inside Spark. As shown in Figure \ref{fig:arch}, for the in-memory storage system, SCache employs the legacy master-slaves architecture like GFS\cite{gfs}. The master node of SCache coordinates the shuffle blocks globally with application context from Spark. The coordination provides two guarantees for the tasks: (a)store data in memory before tasks start and (b)schedule data on-off memory with all-or-nothing constraint to benifit all tasks in a stage.
 \begin{figure}
 	\centering
 	\includegraphics[width=\linewidth]{fig/arch}
