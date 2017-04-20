@@ -158,7 +158,8 @@ We randomly pick one observation map output and plot. As we can see, in hash par
 
 To avoid this inconsistency in some cases, we introduce another methodology, weighted reservoir sampling, to mitigate this inconsistency. The classic reservoir samppling is designed for randomly chossing \textit{k} samples from \textit{n} items, where \textit{n} is either a very large or unknown number\cite{reservoir}. For each partition of data that produce shuffle output, we use reservoir sampling to randomly pick $s \times p$ of samples, where $p$ is the number of reduce tasks and $s$ is a tunable number. The number of input data partition and reduce tasks can be easily obtained when the from the DAG information. In Figure \ref{fig:range_pre_sample}, we set $s = 3$. Afther that, the map function is called locally to process the sampled data. As the 'Sampling' part showen in Figure \ref{fig:shuffle}, the final sampling map outputs are collected with the size of each parition of input data which is used as weight for each set of sample. For each reduce, the predicted size $reduceSize_i$
 
-\begin{equation} 
+\begin{equation}
+\label{equationsample} 
 \begin{aligned}
 	reduceSize_i = {\displaystyle\sum_{j=0}^{m} {partitionSize_j \times \frac{sample_i}{s \times p}}} \\ 
 	{\left( m = \text{partition number of input data} \right)}
@@ -179,7 +180,7 @@ As we can see in Figure \ref{fig:range_pre_sample}, the prediction result is muc
 		\While{$rid \geq 0$}
 		\Comment{Schedule redues by MinHeap}
 		\State Update $M\left[0\right].size$
-		\State Assign $rid$ to $M\left[0\right]$
+		\State Assign $R\left(rid\right)$ to $M\left[0\right]$
 		\State sift\_down$\left(M\left[0\right]\right)$
 		\State
 		\Comment{Use min-heap according to size in $M$}
@@ -297,6 +298,7 @@ When a new shuffle start, the $mSchedule$ is called to schedule the current shuf
 
 \section{Implementation}\label{impl}
 This section overviews the implementation of SCache -- a distributed in-memory storage system that caches shuffle data of DAG framework. Here we use Spark as example of DAG framwork to illustrate working process of shuffle optimization. We will first present system architecture in Subsection \ref{arch} while the following two subsections focuss on the two main challenges: memory manangement and fault tolerence.
+
 \subsection{System Architecture}\label{arch}
 SCache consists mainly two components: A distributed in-memory shuffle data storage system and the daemon inside Spark. As shown in Figure \ref{fig:arch}, for the in-memory storage system, SCache employs the legacy master-slaves architecture like GFS\cite{gfs}. The master node of SCache coordinates the shuffle blocks globally with application context from Spark. The coordination provides two guarantees: (a)store data in memory before tasks start and (b)schedule data on-off memory with all-or-nothing and strict priority constraints to benifit all jobs. 
 
@@ -306,13 +308,25 @@ For the hash partitioner, when the map tasks in a stage finish computing on the 
 
 Before the reduce stage starts, Spark DAG Scheduler will first generate a task set for this stage with different locality levels -- \textbf{\textit{PROCESS\_LOCAL, NODE\_LOCAL, NO\_PREF, RACK\_LOCAL, ANY}}. The locality levels are set by finding a cached location of a RDD. For the RDDs that have narrow dependency(oppsite ot shuffle dependency), the prefered location can also be the same as the depedent RDDs. For those RDDs that have shuffle dependecies, the locality will be set as \textbf{\textit{NO\_PREF}} by default. To enforce SCache pre-allocated the reduce tasks, we insert some lines of codes in Spark DAG Scheduler to consult SCache Master to get the preferred node for each tasks. By doing this, the tasks with shuffle dependencies can be set as \textbf{\textit{NODE\_LOCAL}}. Then the Task Scheduler will schedule tasks according to the task -- node mapping from SCache. 
 
+When the scheduled reduce tasks start, the shuffle input data is requested. The SCache worker will then pass the requested data through memory copy from the reserved memory to Spark executor JVM memory. 
 
 \subsubsection{Reservior Sampling}\label{sampling}
+If the submitted shuffle dependencies contain a Rrange Partitioner or a customed partitioner, the SCache master will send a sampling request to the daemon process in Spark driver. The daemon process will then submit a job on Spark for the current RDD. This sampling job will use a reservoir sampling algorithm\cite{reservoir} on each partition of RDD since the items size of each partition is unknow before sampling. For the sample number, we set the size equals to $3 \times number\ of\ partitions$ for balancing overhead and accurancy (it can be tuned by configuration). The sampling job will then perform a local shuffle with the selected items and partitioner (see Figure \ref{fig:sample}). At the same time, the size of items is counted as the weight of each partition.These sampling data will be aggregated by $reduce\ ID$on SCache master. The size for each reduce partition can be easily computed by equation \ref{equationsample}. After the prediction, master will call algorithm \ref{mhminheap} and \ref{hminheap} to do the scheduling. 
+
+\subsection{Memory Management}
+As mentioned in section \ref{shufflesize}
+
 \begin{figure}
 	\centering
 	\includegraphics[width=\linewidth]{fig/arch}
 	\caption{SCache Architecture}
 	\label{fig:arch}
+\end{figure}
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{fig/sample}
+	\caption{Demonstration of Reservoir Sampling}
+	\label{fig:sample}
 \end{figure}
 \section{Evaluation}\label{evaluation}
 
