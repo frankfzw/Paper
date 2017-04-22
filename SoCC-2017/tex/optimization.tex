@@ -37,7 +37,7 @@ When the shuffle output blocks are available in memory, they can be pre-fetched 
 	\end{minipage}
 \end{figure*}
 Note that since most of the traces from OpenCloud is shuffle-light workload as showen in Figure \ref{fig:cdf}. The average shuffle read time is 2.3\% of total reduce completion time. So we will only use this trace to evalute the pre-scheduling. 
-\subsubsection{Random Task-Node Mapping}
+\subsubsection{Random Task-Node Mapping}\label{randomassign}
 The simplest way of pre-scheduling is mapping tasks to different nodes evenly. As shown in Figure \ref{fig:sim}, Random mapping works well when there is only one round of tasks in cluster. But multi-round in cluster is overwhleming according to Section \ref{multi}. The performance of random mapping collapses as the round number grows. After analyzing the trace, we find out that it's caused by data-skew. Reports in these papers\cite{skewtune, reining, gufler2012load} also claim that data-skew is commonly exist in data-parallel computing. When we apply a random mapping, it's probable to assign sevearl slow tasks on one node. The collision than slow down the the whole stage, which make the performance even worse than those without shuffle-prefetch. In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which can bring extra network traffic in cluster. 
 
 

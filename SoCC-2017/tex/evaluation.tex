@@ -1,1 +1,12 @@
 \section{Evaluation}\label{evaluation}
+
+In this section, we present the evaluation result of Spark with SCache comparing with the original Spark. We first run simple DAG computing jobs with two stages to analyze the impact of shuffle pre-fetch in the Spark cluster. The shuffle dependency between two stages contains one shuffle and two shuffles respectively. In order to prove the performance gain of SCache with a real production workload, we run a benchmark named Spark Terasort\cite{spark-tera} and TPC-DS\cite{tpcds} and evaluate the improvement of SCache for each stage and the overall performance. At last, we prsent the overhead of sampling.
+
+\subsection{Setup}\label{stepup}
+We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2\cite{aws}. Each node has 16GB memory and 4 CPUs. The network bandwidth is not specifically provided by Amazon. Our evaluation reveals the bandwidth is about 300 Mbps(see Figure \ref{fig:util}).
+
+\subsection{Simple DAG Analysis}
+
+\subsection{Performance Gain in Production Workload}
+
+\subsection{Overhead of Sampling}
