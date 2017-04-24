@@ -1,6 +1,6 @@
 \begin{abstract}
 
-Shuffle is the term used to describe the cross-network read and aggregation of partitioned ancestor data before invoking reduce operation.
+Shuffle is the term used to describe the cross-network read and aggregation of partitioned data from ancestral taks before invoking reduce operation.
 As DAG computing frameworks keep evolving, calculation and scheduling of each task are well optimized. 
 However shuffle cuts off the data processing pipeline, introduce significant latency to successors.
 To remove shuffle overhead, we present SCache, a plugin system to decouple shuffle from DAG computing framework. SCache captures shuffle data in the memory and uses heuristic-MinHeap scheduling to balance data blocks to eliminate the explicit barrier. We implement SCache and change Spark to use SCache as external shuffle service and co-scheduler. We evaluate SCache performance both on simulation and 50-machines Amazon EC2 cluster.
