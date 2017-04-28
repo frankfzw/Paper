@@ -1,0 +1,64 @@
+This is BibTeX, Version 0.99d (TeX Live 2015)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: template.aux
+The style file: abbrv.bst
+Database file #1: biblio.bib
+Repeated entry---line 511 of file biblio.bib
+ : @inproceedings{shufflewatcher
+ :                              ,
+I'm skipping whatever remains of this entry
+Warning--to sort, need author or key in hadooptutorial
+Warning--to sort, need author or key in sparkconf
+Warning--to sort, need author or key in sparksource
+Warning--to sort, need author or key in opencloudtrace
+Warning--to sort, need author or key in spark-tera
+Warning--to sort, need author or key in tpcds
+Warning--to sort, need author or key in aws
+Warning--can't use both volume and number fields in reining
+Warning--can't use both volume and number fields in managing
+Warning--can't use both volume and number fields in varys
+Warning--can't use both volume and number fields in gfs
+Warning--can't use both volume and number fields in starfish
+Warning--can't use both volume and number fields in mesos
+You've used 32 entries,
+            2118 wiz_defined-function locations,
+            664 strings with 9524 characters,
+and the built_in function-call counts, 13420 in all, are:
+= -- 1320
+> -- 659
+< -- 30
++ -- 266
+- -- 232
+* -- 930
+:= -- 2004
+add.period$ -- 103
+call.type$ -- 32
+change.case$ -- 212
+chr.to.int$ -- 0
+cite$ -- 45
+duplicate$ -- 539
+empty$ -- 1060
+format.name$ -- 232
+if$ -- 2971
+int.to.chr$ -- 0
+int.to.str$ -- 32
+missing$ -- 25
+newline$ -- 156
+num.names$ -- 50
+pop$ -- 293
+preamble$ -- 1
+purify$ -- 180
+quote$ -- 0
+skip$ -- 424
+stack$ -- 0
+substring$ -- 736
+swap$ -- 219
+text.length$ -- 30
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 128
+warning$ -- 13
+while$ -- 116
+width$ -- 34
+write$ -- 348
+(There was 1 error message)
