@@ -1,6 +1,6 @@
 \section{Evaluation}\label{evaluation}
 
-In this section, we present the evaluation result of Spark with SCache comparing with the original Spark. We first run simple DAG computing jobs with two stages to analyze the impact of shuffle pre-fetch on the scope of the hardware resources differences of the Spark cluster. The shuffle dependency between two stages contains one shuffle and two shuffles respectively. In addition, we run a shuffle heavy benchmark named Spark Terasort\cite{spark-tera}. In order to prove the performance gain of SCache with a real production workload -- Spark TPC-DS\cite{sparktpcds} and evaluate the improvement of SCache for each stage and the overall performance. At last, we prsent the overhead of sampling. Because a complex Spark application consists of multiple stages. The completion time of each stage varies under different input data and configurations, as well as different number of stages. This uncertainty leads to the dilemma that dramatic fluctuation in overall performance comparing. To present a straightforward illustration, we limit the scope of most evalutions in single stages. 
+In this section, we present the evaluation result of Spark with SCache comparing with the original Spark. We first run simple DAG computing jobs with two stages to analyze the impact of shuffle pre-fetch on the scope of the hardware resources differences of the Spark cluster. The shuffle dependency between two stages contains one shuffle. In addition, we run a shuffle heavy benchmark named Spark Terasort\cite{spark-tera}. In order to prove the performance gain of SCache with a real production workload -- Spark TPC-DS\cite{sparktpcds} and evaluate the improvement of SCache for each stage and the overall performance. At last, we prsent the overhead of sampling. Because a complex Spark application consists of multiple stages. The completion time of each stage varies under different input data and configurations, as well as different number of stages. This uncertainty leads to the dilemma that dramatic fluctuation in overall performance comparing. To present a straightforward illustration, we limit the scope of most evalutions in single stages. 
 
 \subsection{Setup}\label{stepup}
 We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2\cite{aws}. Each node has 16GB memory and 4 CPUs. The network bandwidth is not specifically provided by Amazon. Our evaluation reveals the bandwidth is about 300 Mbps(see Figure \ref{fig:util}).
@@ -18,7 +18,42 @@ We first run the same single shuffle test (GroupByTest from Spark example\cite{s
 
 \subsubsection{Performace Gain in Detail}
 
-As shown in \textcolor{red}{Figure}, we run these tow jobs with different input size in the cluster. We measure the completion time of each phase during the job, including shuffle write/read time and computing time. In the shuffle map stage, SCache optimizes \textcolor{red}{number} of shuffle write time. But time of shuffle write cannot be eliminate totally because the serialization is inevitable while moving data out of Java heap memory. Instead, the network transfer and disk read contribute significantly of decreasing time consumption of shuffle read, so that we can have a huge performance gain in both shuffle read and the completion time of whole reduce stage. By doing shuffle data pre-fetch, the shuffle read time decreases \textcolor{red}{number} on avarage, which contributes a \textcolor{red}{number} less completion time of reduce stages.
+As shown in Figure \ref{fig:singleshuffle}, we run the single shuffle test with different input size in the cluster. For each stage, we run 10 rounds of tasks. We plot the stage completion time seperately in Figure \ref{fig:mapstage} and Figure \ref{fig:reducestage}. We measure the completion time of each phase during the job, including shuffle write/read time and computing time. In addition, we also present the detail information of median task in each stage in Figure \ref{fig:singleshuffletask}. In the shuffle map stage, SCache optimizes 10\% of stage completion time on avarage. For a single map task, about 40\% of shuffle write time can be eliminated by SCache (Figure \ref{fig:maptask}). Because the serialization of data is CPU intensive\cite{makingsense} and it is inevitable while moving data out of Java heap memory, SCache cannot eliminate the whole phase of shuffle write. 
+
+For reduc stage, instead, the network transfer and disk read contribute significantly of decreasing time consumption of shuffle read. In addition, heuristic reduce tasks scheduling acheives better load balance in cluster than the Spark default FIFO scheuling. So that we can have a \~75\% performance gain in the completion time of whole reduce stage. By doing shuffle data pre-fetch for the reduce tasks in Figure \ref{fig:reducetask}, the shuffle read time decreases \~100\%, which means shuffle data pre-fetch almost hide all the explict network transfer in the reduce stage.
+
+Combing two side of map and reduce, SCache can help Spark decrease about 89\% time in the whole shuffle process.
+
+\begin{figure}
+\begin{subfigure}{\linewidth}
+	\includegraphics[width=\linewidth]{fig/groupbymapstage}
+	\caption{Map Stage Completion Time Comparsion}
+	\label{fig:mapstage}
+\end{subfigure}
+\begin{subfigure}{\linewidth}
+	\includegraphics[width=\linewidth]{fig/groupbyreducestage}
+	\caption{Reduce Stage Completion Time Comparsion}
+	\label{fig:reducestage}
+\end{subfigure}
+\caption{Stage Completion Time Comparsion of Single Shuffle Test}
+\label{fig:singleshuffle}
+\end{figure}
+
+\begin{figure}
+\begin{subfigure}{\linewidth}
+	\includegraphics[width=\linewidth]{fig/groupbymaptask}
+	\caption{Map Stage Completion Time Comparsion}
+	\label{fig:maptask}
+\end{subfigure}
+\begin{subfigure}{\linewidth}
+	\includegraphics[width=\linewidth]{fig/groupbyreducetask}
+	\caption{Task Details in Map and Reduce Stages}
+	\label{fig:reducetask}
+\end{subfigure}
+\caption{Stage Completion Time Comparsion of Single Shuffle Test}
+\label{fig:singleshuffletask}
+\end{figure}
+
 
 \subsection{Terasort}
 In this part, we evaluate the both TeraSort\cite{spark-tera}. 

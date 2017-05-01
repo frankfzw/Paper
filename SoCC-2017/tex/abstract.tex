@@ -1,9 +1,11 @@
 \begin{abstract}
 
-Shuffle is the term used to describe the cross-network read and aggregation of partitioned data from ancestral taks before invoking reduce operation.
-As DAG computing frameworks keep evolving, calculation and scheduling of each task are well optimized. 
-However shuffle cuts off the data processing pipeline, introduce significant latency to successors.
-To remove shuffle overhead, we present SCache, a plugin system to decouple shuffle from DAG computing framework. SCache captures shuffle data in the memory and uses heuristic-MinHeap scheduling to balance data blocks to eliminate the explicit barrier. We implement SCache and change Spark to use SCache as external shuffle service and co-scheduler. We evaluate SCache performance both on simulation and 50-machines Amazon EC2 cluster.
-Results show that, by incorporating SCache, the shuffle overhead of Spark can be reduced in overall 90\%.
-
+In large-scale data-parallel analytics, \textit{shuffle}, or the cross-network read and aggregation of partitioned data between tasks with data dependencies, usually brings in large network transfer overhead.
+Due to the dependency constrains, execution of those descendant tasks could be delayed by logy shuffles.
+To reduce shuffle overhead, we present \textit{SCache}, a plugin system that particularly focuses on shuffle optimization in frameworks defining jobs as \textit{directed acyclic graphs} (DAGs). 
+To reduce shuffle overhead, we present \textit{SCache}, a plugin system that particularly focuses on shuffle optimization in frameworks defining jobs as \textit{directed acyclic graphs} (DAGs). 
+By extracting and analyzing the job DAGs and shuffle dependencies prior to the actual job execution, SCache can take full advantage of the system memory to accelerate the shuffle process. Meanwhile, it adopts heuristic-MinHeap scheduling combining with reduce size prediction to balance the total size of data that will be processed by each descendant task on each node. 
+We have implemented SCache and customized Spark to use it as the external shuffle service and co-scheduler. The performance of SCache is evaluated with both simulations and testbed experiments on a 50-node Amazon EC2 cluster.
+Those evaluations have demonstrated that, by incorporating SCache, the shuffle overhead of Spark can be reduced by nearly $88\%$.
+  
 \end{abstract}
