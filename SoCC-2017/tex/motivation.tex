@@ -3,21 +3,23 @@
 In this section, we first study the typical shuffle characteristics (\ref{shuffle pattern}), and then spot the opportunities to achieve shuffle optmization (\ref{observation})
 \subsection{Characteristic of Shuffle} \label{shuffle pattern}
 
-In large scale data parallel computing, enormous datasets are partitioned into pieces to fit the memory of each node since the very beginning of MapReduce\cite{mapreduce} model.
-Meanwhile, complicated application procedures are divided into steps. The successor steps take the output of ancestors as input to do the computation. Shuffle occurs when each successor needs 
-part of data from all ancestors' output. In order to provide a clear illustration, we define those computing on each partition of data in one step as a task. For tasks that generate shuffle output, we call
-them map task. For tasks that consume shuffle output, we call them reudce tasks. Note that one task may have both shuffle data generation and consumption in modern DAG framework. These tasks contain characteristic of both map task and reduce task. But these tasks won't change the behavior of shuffle. To avoid ambiguity, in the following paper, we will only use term of map task to represent those who produce shuffle output, and reduce task to represent those who consume shuffle output.
+In large scale data parallel computing, enormous datasets are partitioned into pieces to fit into the memory of each node.
+Meanwhile, complicated application procedures are divided into steps. The succeeeding steps take the output of ancestors as computation input. Shuffle occurs when each successor needs 
+part of data from all ancestors' output. It is designed to achieve an all-to-all data blocks transfer among nodes in the cluster. It exists in both MapReduce models and DAG computation models.
+For clear illustration, we define those computing on each partition of data in one step as a \textit{task}. 
+Those tasks that generate shuffle outputs are called as \textit{map} tasks, and tasks consuming shuffle outputs are called \textit{reduce} tasks.
+% Note that one task may have both shuffle data generation and consumption in modern DAG framework. These tasks contain characteristic of both map task and reduce task. But these tasks won't change the behavior of shuffle. To avoid ambiguity, in the following paper, we will only use term of map task to represent those who produce shuffle output, and reduce task to represent those who consume shuffle output.
 
-Shuffle is designed to achieve an all-to-all data blocks transfer among nodes in the cluster. It exists in both MapReduce models and DAG computation models.
+\textbf{Overview of shuffle process}. As shown in Figure \ref{fig:shuffle_process}. Shuffle mainly contains two phases itself: \textit{data partition} and \textit{data transfer}. For \textit{data partition}, each map task will partition the result data (key, value pair) after execution ("Execution" block in Figure \ref{fig:shuffle_process}) into several buckets according to the partition function.
+The total number of buckets equals to the number of tasks in the next step. 
+\textit{Data Transfer} can be further divided into two parts: \textit{shuffle write} and \textit{shuffle read}. \textit{Shuffle write} starts after data partition ("Data Partition" block in Figure \ref{fig:shuffle_process}) of map tasks. 
+During \textit{shuffle wirte}, all the partitioned shuffle output data will be written into local persistent storage for fault tolerance \cite{mapreduce, spark}.
+\textit{Shuffle read} starts at the beginning of reduce tasks. These tasks might fetch the data that belong to their corresponding partitions from both remote nodes and local storage.
 
-The overview process of shuffle is presented in Figure \ref{fig:shuffle_process}. Shuffle mainly contains two phases itself: \textit{Data Partition} and \textit{Data Transfer}. For \textit{Data Partition}, each map task will partition the result data (key, value pair) into several buckets according to the partition function.
-The bucket number equals to the number of tasks in the next step. When the map tasks finish, all the shuffle output data will be written into local persistent storage for fault tolerance \cite{mapreduce, spark}.
-\textit{Data Transfer} can be further divided into two parts: \textit{Shuffle Write} and \textit{Shuffle Read}. \textit{Shuffle Write} starts after execution of map tasks and intermediate tasks. Partitioned data will  be stored on disk during \textit{Shuffle Write}. \textit{Shuffle Read} starts at the beginning of reduce tasks. These tasks will fetch the data that belong to their corresponding partitions from both remote nodes and local storage.
+%In short, shuffle is loosely coupled with application context and it's I/O intensive.
 
-In short, shuffle is loosely coupled with application context and it's I/O intensive.
-
-Since the intensive I/O operation is triggered during a shuffle, this can introduce a significant latency to the application. Reports show that, 60\% of MapReduce jobs at Yahoo
-and 20\% at Facebook are shuffle intensive workloads\cite{shufflewatcher}. For those shuffle intensive jobs, the shuffle lantency may even dominate Job Completion Time. 
+\textbf{Impact of shuffle process}. Shuffle process is I/O intensive, which might can introduce a significant latency to the application. Reports show that, 60\% of MapReduce jobs at Yahoo
+and 20\% at Facebook are shuffle intensive workloads\cite{shufflewatcher}. For those shuffle intensive jobs, the shuffle lantency can even dominate Job Completion Time (JCT). 
 For instance, a MapReduce trace analysis from Facebook shows that shuffle accounts for 33\% JCT on average, up to 70\% in shuffle intensive jobs\cite{managing}.
 Meanwhile, the completion time of shuffle correlates with the performance of storage devices, network and even applications. 
 This variation may bring a huge challenge for operators to find the correct configuration of the DAG framework.
@@ -39,7 +41,7 @@ Figure \ref{fig:util} contains data, including two stages connected by one shuff
 
 \begin{figure}
 	\includegraphics[width=\linewidth]{fig/util}
-	\caption{CPU utiliazation and I/O throughput of a node during a Spark single shuffle application}
+	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
 	\label{fig:util}
 \end{figure}
 
