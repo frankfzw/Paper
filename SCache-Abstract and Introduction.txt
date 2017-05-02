@@ -1,0 +1,34 @@
+1. 摘要中 To reduce shuffle overhead 一句重复出现了，应该删除后面一句。
+
+2. 摘要中 the job DAGs 应该删掉job，因为前一句已经定义jobs为DAGs了。 
+
+3. Apache Tez后面的参考文献引用是问号。后面有类似的问题。
+
+4. Introduction 第一段 Tremendous effeots 有拼写错误，应为 efforts 
+
+5. Introduction 第一段 from the the low level storage system中 the重复出现两次
+其次是否可以改为low level storage systems，这样和后面的 scheduling algorithms 对应起来。
+
+6. Introduction 第三段 开头一句the straight forward way 有点突兀，应该讲在早期，解决上诉问题的直接方式是blabla
+
+7. Introduction 第三段 Nearly all MapReduce 加上一个 Nearly all MapReduce frameworks
+
+8. Introduction 第三段 And the ”slot” is occupied when the of reduce tasks begin to read shuffle data from remote nodes through network 中 the of reduce tasks 中的of应该是多余，改为 reduce tasks。
+
+9. To this end 这句里面 提到了 without manually change every DAG framework. 但上文中并未陈述哪些文献中，有这部分的不足。
+
+10. 第四段, an plugin system 应该为 a plugin system
+
+11. 第四段，In Figure 1, SCache hijacks中 hijack 这个词有贬义的色彩，能否更换一个更中性的词？
+
+12. 第五段， naive 中间的i貌似是输入法有问题。 此外对hadoop mapreduce 不是很重要，为什么要放在第2句呢？ 这样写就成了第一句说重要，第二句马上有个反例了，不太符合表述的逻辑。
+
+13. 第六段， all-or-nothing and context-aware 这个两个限制应该解释一下，否则有点突兀。
+
+14. Introduction最后一段  Our evaluation in a 50-node Aamazon EC2 cluster.  这一句话没有谓语， 此外 Aamazon 拼写错误， 应该是Amazon。
+
+15. We also这一句前面没有空格。
+
+
+
+
