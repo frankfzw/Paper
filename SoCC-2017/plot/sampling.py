@@ -16,7 +16,7 @@ light_orange = '#FFE4B5'
 blue = '#1E90FF'
 green = '#2E8B57'
 
-f = open('./plot/tera')
+f = open('./tera')
 
 X = np.zeros((10, 6))
 Y = np.zeros((10, 6))
@@ -35,6 +35,9 @@ for line in f:
         i += 1
 verts = []
 zs = []
+
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -55,8 +58,8 @@ poly = PolyCollection(verts, facecolors=light_orange, linewidths=0)
 poly.set_alpha(0.3)
 ax.add_collection3d(poly, zs=zs, zdir='y')
 
-ax.set_xlabel('Cluster Size')
-ax.set_ylabel('Size Per Node')
-ax.set_zlabel('Sampling Time(S)')
+ax.set_xlabel('Cluster Size', fontsize=16)
+ax.set_ylabel('Size Per Node(GB)', fontsize=16)
+ax.set_zlabel('Sampling Time(S)', fontsize=16)
 
 plt.show()
