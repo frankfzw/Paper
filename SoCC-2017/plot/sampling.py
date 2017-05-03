@@ -13,10 +13,10 @@ import numpy as np
 
 orage = '#FF8C00'
 light_orange = '#FFE4B5'
-blue = '#1E90FF'
+blue = '#4682B4'
 green = '#2E8B57'
 
-f = open('./tera')
+f = open('./sampling')
 
 X = np.zeros((10, 6))
 Y = np.zeros((10, 6))
@@ -38,6 +38,8 @@ zs = []
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
+plt.rc('xtick', labelsize=12)
+plt.rc('ytick', labelsize=12)
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
