@@ -22,8 +22,8 @@ def plot_hash(f):
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=12)
-    plt.rc('ytick', labelsize=12)
+    plt.rc('xtick', labelsize=14)
+    plt.rc('ytick', labelsize=14)
     # plt.rc('hatch', linewidth=2)
     
     
@@ -47,7 +47,7 @@ def plot_hash(f):
     ax.set_xticks(xs + width)
     ax.set_xticklabels(np.arange(len(reduce_dis)))
     # ax.legend(loc=4, fontsize=16, frameon=False)
-    ax.set_ylabel('Normalized Size', fontsize=16)
+    ax.set_ylabel('Normalized Size', fontsize=18)
     ax.set_aspect(0.6 / ax.get_data_ratio())
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
             loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -67,8 +67,8 @@ def plot_err(f):
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=12)
-    plt.rc('ytick', labelsize=12)
+    plt.rc('xtick', labelsize=14)
+    plt.rc('ytick', labelsize=14)
     # plt.rc('hatch', linewidth=2)
     
     
@@ -91,8 +91,9 @@ def plot_err(f):
             mec='none',
             label='Sampling Prediction')
     # ax.legend(loc=4, fontsize=16, frameon=False)
+    ax.set_xticks(xs)
     ax.set_xticklabels(xs)
-    ax.set_ylabel('Relative Error', fontsize=16)
+    ax.set_ylabel('Relative Error', fontsize=18)
     ax.set_aspect(0.6 / ax.get_data_ratio())
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
             loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -118,8 +119,8 @@ def plot_range(f):
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=12)
-    plt.rc('ytick', labelsize=12)
+    plt.rc('xtick', labelsize=14)
+    plt.rc('ytick', labelsize=14)
     # plt.rc('hatch', linewidth=2)
     
     
@@ -151,7 +152,7 @@ def plot_range(f):
     ax.set_xticks(xs + width)
     ax.set_xticklabels(np.arange(len(reduce_dis)))
     # ax.legend(loc=4, fontsize=16, frameon=False)
-    ax.set_ylabel('Normalized Size', fontsize=16)
+    ax.set_ylabel('Normalized Size', fontsize=18)
     ax.set_aspect(0.6 / ax.get_data_ratio())
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
             loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -161,9 +162,9 @@ def plot_range(f):
 
 
 
-# f = open('./hash_pre')
-# plot_hash(f)
-# f = open('./range_pre')
-# plot_range(f)
+f = open('./hash_pre')
+plot_hash(f)
+f = open('./range_pre')
+plot_range(f)
 f = open('./prediction_relative_error')
 plot_err(f)

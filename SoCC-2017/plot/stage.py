@@ -58,8 +58,8 @@ ax.barh(input_size + width, spark_map, width,
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Map Stage Completion Time(S)', fontsize=16)
-ax.set_ylabel('Input Size(GB)', fontsize=16)
+ax.set_xlabel('Map Stage Completion Time (s)', fontsize=16)
+ax.set_ylabel('Input Size (GB)', fontsize=16)
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
         loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -84,8 +84,8 @@ ax.barh(input_size + width, spark_reduce, width,
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Redcue Stage Completion Time(S)', fontsize=16)
-ax.set_ylabel('Input Size(GB)', fontsize=16)
+ax.set_xlabel('Redcue Stage Completion Time (s)', fontsize=16)
+ax.set_ylabel('Input Size (GB)', fontsize=16)
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
         loc=3, ncol=2, mode="expand", borderaxespad=0., 

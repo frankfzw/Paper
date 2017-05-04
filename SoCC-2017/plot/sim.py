@@ -46,7 +46,7 @@ def plot_sim(f):
             marker="s",
             markersize=10,
             mec='none',
-            label='FIFO')
+            label='Spark')
     ax.plot(xs, heap, 
             linewidth=3,
             color=green, 

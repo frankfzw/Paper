@@ -17,19 +17,19 @@ If the submitted shuffle dependencies contain a Range Partitioner or a customize
 
 \begin{figure}
 	\centering
-	\includegraphics[width=\linewidth]{fig/arch}
+	\includegraphics[width=0.9\linewidth]{fig/arch}
 	\caption{SCache Architecture}
 	\label{fig:arch}
 \end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=\linewidth]{fig/sample}
+	\includegraphics[width=0.7\linewidth]{fig/sample}
 	\caption{Reservoir Sampling of One Partition}
 	\label{fig:sample}
 \end{figure}
 
 \subsection{Memory Management}
-As mentioned in section \ref{shufflesize}, the shuffle size is small enough that can be easily fit in memory. In order to minimize the reserved memory of SCache worker on each node or configure the wrong size by user, the probability of memory exceeded is still exist, especially for multiple existing applications scenarios. When the cached data meet the limitation of reserved memory, SCache flushes some of them to the disk temporarily. And re-fetch them as soon as some cached shuffle blocks is consumed by tasks. To achieve maximum improvement in overall, SCache leverages two constraints to manage the in-memory data -- all-or-nothing and  context-aware-priority property.
+As mentioned in section \ref{observation}, the shuffle size is small enough that can be easily fit in memory. In order to minimize the reserved memory of SCache worker on each node or configure the wrong size by user, the probability of memory exceeded is still exist, especially for multiple existing applications scenarios. When the cached data meet the limitation of reserved memory, SCache flushes some of them to the disk temporarily. And re-fetch them as soon as some cached shuffle blocks is consumed by tasks. To achieve maximum improvement in overall, SCache leverages two constraints to manage the in-memory data -- all-or-nothing and  context-aware-priority property.
 
 \subsubsection{All-or-Nothing Property}
 Achieving memory cached shuffle data for a reduce task will shorten the task execution time. But this acceleration of single task doesn't speed up the whole stage. Base on the observation that in most cases one single stage contains multi-rounds of tasks from section \ref{multi}, the shuffle cache should at least benefit all tasks in one round. If one of the task misses a memory cache and exceeds the original bottleneck of this round, that task will become the new bottleneck of that round and can further slow down the whole stage. PACMan\cite{pacman} has proved that for multi-round stage/job, the completion times improves in steps when $n\times number\ of\ tasks\ in\ one\ round$ tasks have data cached in local memory. Therefore, the memory cache of shuffle data need to match at least every round of tasks in a stage. We refer to this as the all-or-noting property. 
@@ -44,6 +44,8 @@ But what if all the units are completed in the cluster? Traditional cache replac
 	\item Inter shuffle units: SCache master follows the scheduling scheme of the task scheduling schemes of Spark. For a FAIR scheduler, Spark will try to balance the resource of among task sets, which leads to a higher scheduled probability for those has more remaining tasks.  The more remaining tasks a stage has, the more storage units exist in the corresponding shuffle unit. Based on this observation, SCache sets priorities from high to low to each shuffle units in descending order of storage units. For a FIFO scheduler, Spark will schedule the task set that is submitted first. So SCache can set the priorities according to the submit time of each shuffle unit and evict the recent ones.
 	\item Intra shuffle unit: When a shuffle unit has been marked as the lowest priority, SCache should decide the order of eviciton among storage units in it. Refer to the task scheduling inside a task set of Spark, the tasks with smaller ID will be scheduled at first under one locality level. Recall that SCache sets all reduce tasks to \textbf{\textit{NODE\_LOCAL}}, it can easily select the storage unit with larger tasks ID and flush them to disk.
 \end{itemize}
+
+
 
 % \subsubsection{Fault Tolerance}
 % To prevent the machine failure in cluster leading to inconsistency SCache, the master node will log the meta data of shuffle register and scheduling on the disk. Since we remove the shuffle transfer from the critical path of DAG computing, the disk log will not introduce extra overhead to the DAG framworks. Note that the master can be implemented with Apache ZooKeeper\cite{zookeeper} to provide constantly service to DAG framework.  
