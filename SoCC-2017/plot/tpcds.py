@@ -46,11 +46,11 @@ xs = np.arange(len(input_size)) * 20
 
 ax.bar(xs, scache, width, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="///",
+        edgecolor=orage, hatch="/////",
         label='Spark With SCache')
 ax.bar(xs + width, spark, width, 
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="+++", label='Spark')
+        edgecolor=blue, hatch="+++++", label='Spark')
 ax.set_xticks(xs + width)
 ax.set_xlim(right=(xs[-1] + 20))
 ax.set_xticklabels(input_size, rotation=60)

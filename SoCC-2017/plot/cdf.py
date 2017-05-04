@@ -31,8 +31,8 @@ x = np.asarray(x)
 y = np.asarray(y)
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
-plt.rc('xtick', labelsize=12)
-plt.rc('ytick', labelsize=12)
+plt.rc('xtick', labelsize=18)
+plt.rc('ytick', labelsize=18)
 # plt.rc('hatch', linewidth=2)
 
 fig, ax = plt.subplots()
@@ -41,8 +41,8 @@ width = 9.5
 ax.plot(x, y, linewidth=3, color=blue)
 
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Shuffle Time Fraction', fontsize=16)
-ax.set_ylabel('CDF', fontsize=16)
+ax.set_xlabel('Shuffle Time Fraction', fontsize=22)
+ax.set_ylabel('CDF', fontsize=22)
 ax.set_aspect(1. / ax.get_data_ratio())
 ax.grid(True)
 # plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 

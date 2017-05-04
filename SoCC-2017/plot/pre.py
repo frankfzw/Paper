@@ -22,8 +22,8 @@ def plot_hash(f):
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=14)
-    plt.rc('ytick', labelsize=14)
+    plt.rc('xtick', labelsize=18)
+    plt.rc('ytick', labelsize=18)
     # plt.rc('hatch', linewidth=2)
     
     
@@ -32,11 +32,11 @@ def plot_hash(f):
     xs = np.arange(len(reduce_dis)) * 20
     ax.bar(xs, reduce_dis, width, 
             linewidth=2, color='none', 
-            edgecolor=orage, hatch="///",
+            edgecolor=orage, hatch="/////",
             label='Reduce Distribution')
     ax.bar(xs + width, observed_dis, width, 
             linewidth=2, color='none', 
-            edgecolor=blue, hatch="+++", label='Obeserved Distribution')
+            edgecolor=blue, hatch="+++++", label='Obeserved Distribution')
     ax.plot(xs + width, predict_dis, 
             linewidth=3,
             color=green, 
@@ -47,7 +47,7 @@ def plot_hash(f):
     ax.set_xticks(xs + width)
     ax.set_xticklabels(np.arange(len(reduce_dis)))
     # ax.legend(loc=4, fontsize=16, frameon=False)
-    ax.set_ylabel('Normalized Size', fontsize=18)
+    ax.set_ylabel('Normalized Size', fontsize=22)
     ax.set_aspect(0.6 / ax.get_data_ratio())
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
             loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -67,8 +67,8 @@ def plot_err(f):
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=14)
-    plt.rc('ytick', labelsize=14)
+    plt.rc('xtick', labelsize=18)
+    plt.rc('ytick', labelsize=18)
     # plt.rc('hatch', linewidth=2)
     
     
@@ -93,7 +93,7 @@ def plot_err(f):
     # ax.legend(loc=4, fontsize=16, frameon=False)
     ax.set_xticks(xs)
     ax.set_xticklabels(xs)
-    ax.set_ylabel('Relative Error', fontsize=18)
+    ax.set_ylabel('Relative Error', fontsize=22)
     ax.set_aspect(0.6 / ax.get_data_ratio())
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
             loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -119,8 +119,8 @@ def plot_range(f):
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=14)
-    plt.rc('ytick', labelsize=14)
+    plt.rc('xtick', labelsize=18)
+    plt.rc('ytick', labelsize=18)
     # plt.rc('hatch', linewidth=2)
     
     
@@ -129,11 +129,11 @@ def plot_range(f):
     xs = np.arange(len(reduce_dis)) * 20
     ax.bar(xs, reduce_dis, width, 
             linewidth=2, color='none', 
-            edgecolor=orage, hatch="///",
+            edgecolor=orage, hatch="/////",
             label='Reduce Distribution')
     ax.bar(xs + width, observed_dis, width, 
             linewidth=2, color='none', 
-            edgecolor=blue, hatch="+++", label='Obeserved Distribution')
+            edgecolor=blue, hatch="+++++", label='Obeserved Distribution')
     ax.plot(xs + width, predict_dis, 
             linewidth=3,
             color=green, 
@@ -152,7 +152,7 @@ def plot_range(f):
     ax.set_xticks(xs + width)
     ax.set_xticklabels(np.arange(len(reduce_dis)))
     # ax.legend(loc=4, fontsize=16, frameon=False)
-    ax.set_ylabel('Normalized Size', fontsize=18)
+    ax.set_ylabel('Normalized Size', fontsize=22)
     ax.set_aspect(0.6 / ax.get_data_ratio())
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
             loc=3, ncol=2, mode="expand", borderaxespad=0., 

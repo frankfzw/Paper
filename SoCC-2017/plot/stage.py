@@ -40,8 +40,8 @@ spark_reduce = np.asarray(spark_reduce)
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
-plt.rc('xtick', labelsize=12)
-plt.rc('ytick', labelsize=12)
+plt.rc('xtick', labelsize=16)
+plt.rc('ytick', labelsize=16)
 
 # plt.rc('hatch', linewidth=2)
 
@@ -50,11 +50,11 @@ width = 8
 
 ax.barh(input_size, scache_map, width, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="///",
+        edgecolor=orage, hatch="/////",
         label='Spark With SCache')
 ax.barh(input_size + width, spark_map, width, 
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="+++", label='Spark')
+        edgecolor=blue, hatch="+++++", label='Spark')
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
@@ -76,11 +76,11 @@ fig, ax = plt.subplots()
 
 ax.barh(input_size, scache_reduce, width, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="///",
+        edgecolor=orage, hatch="/////",
         label='Spark With SCache')
 ax.barh(input_size + width, spark_reduce, width, 
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="+++", label='Spark')
+        edgecolor=blue, hatch="+++++", label='Spark')
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
