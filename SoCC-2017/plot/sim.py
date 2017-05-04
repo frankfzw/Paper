@@ -57,7 +57,7 @@ def plot_sim(f):
     ax.plot(xs, ys, linewidth=3, color='r', ls='--')
     ax.legend(loc=4, fontsize=16, frameon=False)
     ax.set_xticklabels(['1','','2','','3','','4','','5',''])
-    ax.set_ylabel('Avg. Improvement%', fontsize=16)
+    ax.set_ylabel('Avg. Improvement \%', fontsize=16)
     ax.set_xlabel('Round', fontsize=16)
     ax.set_aspect(0.6 / ax.get_data_ratio())
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
