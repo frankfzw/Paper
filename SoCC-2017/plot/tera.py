@@ -25,8 +25,8 @@ for line in f:
     if len(args) == 0:
         continue
     input_size.append(int(args[0]))
-    spark_reduce.append(float(args[1]))
-    scache_reduce.append(float(args[2]))
+    spark_reduce.append(float(args[2]))
+    scache_reduce.append(float(args[1]))
 
 input_size = np.asarray(input_size)
 xs = np.arange(len(input_size)) * 20
