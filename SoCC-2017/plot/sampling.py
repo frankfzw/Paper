@@ -61,7 +61,7 @@ poly.set_alpha(0.3)
 ax.add_collection3d(poly, zs=zs, zdir='y')
 
 ax.set_xlabel('Cluster Size', fontsize=16)
-ax.set_ylabel('Size Per Node(GB)', fontsize=16)
-ax.set_zlabel('Sampling Time(S)', fontsize=16)
+ax.set_ylabel('Size Per Node (GB)', fontsize=16)
+ax.set_zlabel('Sampling Time (s)', fontsize=16)
 
 plt.show()

@@ -91,6 +91,7 @@ def plot_err(f):
             mec='none',
             label='Sampling Prediction')
     # ax.legend(loc=4, fontsize=16, frameon=False)
+    ax.set_ylim(bottom=-0.1)
     ax.set_xticks(xs)
     ax.set_xticklabels(xs)
     ax.set_ylabel('Relative Error', fontsize=22)
@@ -162,9 +163,9 @@ def plot_range(f):
 
 
 
-f = open('./hash_pre')
-plot_hash(f)
-f = open('./range_pre')
-plot_range(f)
+#f = open('./hash_pre')
+#plot_hash(f)
+#f = open('./range_pre')
+#plot_range(f)
 f = open('./prediction_relative_error')
 plot_err(f)

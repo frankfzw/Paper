@@ -25,8 +25,8 @@ for line in f:
     if len(args) == 0:
         continue
     input_size.append(args[0])
-    spark.append(float(args[1]))
-    scache.append(float(args[2]))
+    spark.append(float(args[2]))
+    scache.append(float(args[1]))
 
 input_size = np.asarray(input_size)
 scache = np.asarray(scache)
