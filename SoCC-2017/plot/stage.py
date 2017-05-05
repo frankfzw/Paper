@@ -26,7 +26,7 @@ for line in f:
     args = line.split()
     if len(args) == 0:
         continue
-    input_size.append(float(args[0]))
+    input_size.append(int(args[0]))
     scache_map.append(float(args[1]))
     spark_map.append(float(args[2]))
     scache_reduce.append(float(args[3]))
@@ -40,8 +40,8 @@ spark_reduce = np.asarray(spark_reduce)
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
-plt.rc('xtick', labelsize=16)
-plt.rc('ytick', labelsize=16)
+plt.rc('xtick', labelsize=18)
+plt.rc('ytick', labelsize=18)
 
 # plt.rc('hatch', linewidth=2)
 
@@ -58,8 +58,8 @@ ax.barh(input_size + width, spark_map, width,
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Map Stage Completion Time (s)', fontsize=16)
-ax.set_ylabel('Input Size (GB)', fontsize=16)
+ax.set_xlabel('Map Stage Completion Time (s)', fontsize=22)
+ax.set_ylabel('Input Size (GB)', fontsize=22)
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
         loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -84,8 +84,8 @@ ax.barh(input_size + width, spark_reduce, width,
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Redcue Stage Completion Time (s)', fontsize=16)
-ax.set_ylabel('Input Size (GB)', fontsize=16)
+ax.set_xlabel('Redcue Stage Completion Time (s)', fontsize=22)
+ax.set_ylabel('Input Size (GB)', fontsize=22)
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
         loc=3, ncol=2, mode="expand", borderaxespad=0., 

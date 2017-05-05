@@ -30,7 +30,7 @@ for line in f:
     args = line.split()
     if len(args) == 0:
         continue
-    input_size.append(float(args[0]))
+    input_size.append(int(args[0]))
     spark_map_exe.append(float(args[1]))
     spark_map_write.append(float(args[2]))
     scache_map_exe.append(float(args[3]))
@@ -80,8 +80,8 @@ ax.barh(input_size + width, spark_map_write, width,
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Time (s)', fontsize=16)
-ax.set_ylabel('Input Size (GB)', fontsize=16)
+ax.set_xlabel('Time (s)', fontsize=22)
+ax.set_ylabel('Input Size (GB)', fontsize=22)
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
         loc=3, ncol=2, mode="expand", borderaxespad=0., 
@@ -115,8 +115,8 @@ ax.barh(input_size + width, spark_reduce_exe, width,
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Time (s)', fontsize=16)
-ax.set_ylabel('Input Size (GB)', fontsize=16)
+ax.set_xlabel('Time (s)', fontsize=22)
+ax.set_ylabel('Input Size (GB)', fontsize=22)
 
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
