@@ -3,18 +3,19 @@
 In this section, we first study the typical shuffle characteristics (\ref{shuffle pattern}), and then spot the opportunities to achieve shuffle optmization (\ref{observation})
 \subsection{Characteristic of Shuffle} \label{shuffle pattern}
 
-In large scale data parallel computing, enormous datasets are partitioned into pieces to fit into the memory of each node.
+In large scale data parallel computing, enormous datasets are partitioned into pieces to fit into the memory of single node.
 Meanwhile, complicated application procedures are divided into steps. The succeeding steps take the output of ancestors as computation input. Shuffle occurs when each successor needs 
-part of data from all ancestors' output. It is designed to achieve an all-to-all data blocks transfer among nodes in the cluster. It exists in both MapReduce models and DAG computation models.
+part of data from all ancestors' output. It is designed to achieve an all-to-all data blocks transfer in cluster. It exists in both MapReduce models and DAG computation models.
 For clear illustration, we define those computing on each partition of data in one step as a \textit{task}. 
 Those tasks that generate shuffle outputs are called as \textit{map} tasks, and tasks consuming shuffle outputs are called as \textit{reduce} tasks.
 % Note that one task may have both shuffle data generation and consumption in modern DAG framework. These tasks contain characteristic of both map task and reduce task. But these tasks won't change the behavior of shuffle. To avoid ambiguity, in the following paper, we will only use term of map task to represent those who produce shuffle output, and reduce task to represent those who consume shuffle output.
 
-\textbf{Overview of shuffle process}. As shown in Figure \ref{fig:shuffle_process}, shuffle mainly contains two phases itself: \textit{data partition} and \textit{data transfer}. For \textit{data partition}, each map task will partition the result data (key, value pair) after execution ("Execution" block in Figure \ref{fig:shuffle_process}) into several buckets according to the partition function.
+\textbf{Overview of shuffle process}. As shown in Figure \ref{fig:shuffle_process}, shuffle data is produced by \textit{data partition}. For \textit{data partition}, each map task will partition the result data (key, value pair) after execution ("Execution" block in Figure \ref{fig:shuffle_process}) into several buckets according to the partition function.
 The total number of buckets equals to the number of tasks in the next step. 
-\textit{Data Transfer} can be further divided into two parts: \textit{shuffle write} and \textit{shuffle read}. \textit{Shuffle write} starts after data partition ("Data Partition" block in Figure \ref{fig:shuffle_process}) of map tasks. 
-During \textit{shuffle write}, all the partitioned shuffle output data will be written into local persistent storage for fault tolerance  \cite{mapreduce, spark}.
-\textit{Shuffle read} starts at the beginning of reduce tasks. These tasks might fetch the data that belong to their corresponding partitions from both remote nodes and local storage.
+Shuffle itself is dedicated to achieve all-to-all \textit{data transfer}.
+It can be further split into two parts: \textit{shuffle write} and \textit{shuffle read}. Shuffle write starts after data partition ("Data Partition" block in Figure \ref{fig:shuffle_process}) of map tasks. 
+All the partitioned shuffle output data will be written into local persistent storage for fault tolerance \cite{mapreduce, spark} during shuffle write.
+Shuffle read starts fetching data that belong to their corresponding partitions from both remote nodes and local storage at the beginning of reduce tasks.
 
 %In short, shuffle is loosely coupled with application context and it's I/O intensive.
 

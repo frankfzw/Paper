@@ -16,30 +16,27 @@ We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \cite{aws}.
 \subsection{Simple DAG Analysis}
 \subsubsection{Differential Runtime Hardware Utilization} 
 We first run the same single shuffle test (GroupByTest from Spark example \cite{sparksource}) as we mentioned in Figure \ref{fig:util}. As shown in Figure \ref{fig:scache_util}, the hardware utilization is captured from one node during the job. Note that since the completion time of whole job is about $50\%$ less then Spark without SCache, the duration of Figure \ref{fig:scache_util} is cut in half as well. A overlap between CPU, disk and network can be easily obeserved in Figure \ref{fig:scache_util}. That is, the I/O operations will never cut off the computing process with the fine granularity resource allocation. By running Spark with SCache, the overall CPU utilization of the cluster stays in a high level. The decoupling of shuffle write from map tasks frees the CPU earlier, which leads to a faster map task computation. The shuffle pre-fetch starts the shuffle data transfer in the early stage of map phase shift the network transfer completion time, so that the computaion of reduce can start immediately afther scheduled. And this is the main performance gain we achieved on the scope of hardware utilization by SCache.
-
 \begin{figure}
-	%\vspace*{-0.01cm}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.9\linewidth]{fig/groupbymapstage}
-		\caption{Map Stage Completion Time Comparison}
-		\label{fig:mapstage}
+		\includegraphics[width=0.9\linewidth]{fig/groupbymaptask}
+		\caption{Median Task Details in Map Stages}
+		\label{fig:maptask}
 	\end{subfigure}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.9\linewidth]{fig/groupbyreducestage}
-		\caption{Reduce Stage Completion Time Comparison}
-		\label{fig:reducestage}
+		\includegraphics[width=0.9\linewidth]{fig/groupbyreducetask}
+		\caption{Median Task Details in Reduce Stages}
+		\label{fig:reducetask}
 	\end{subfigure}
-	\caption{Stage Completion Time of Single Shuffle Test}
-	\label{fig:singleshuffle}
+	\caption{Median Task Completion Time of Single Shuffle Test}
+	\label{fig:singleshuffletask}
 \end{figure}
+
 As shown in Figure \ref{fig:singleshuffle}, we run the single shuffle test with different input sizes in the cluster. For each stage, we run 5 rounds of tasks. The stage completion time is presented seperately in Figure \ref{fig:mapstage} and Figure \ref{fig:reducestage}. By running spark with SCache, the completion tiem of map stage can be reduce $10\%$ on average. For reduce stage, instead, SCache achieves a ~$75\%$ performance gain in the completion time of whole reduce stage.
 
 Combining with Figure \ref{fig:singleshuffletask}, we present a detail analysis into the nutshell of varied overall performance gain on different stages. For each stage, we pick the median task and present in Figure \ref{fig:singleshuffletask}. For a single map task, about 40\% of shuffle write time can be eliminated by SCache (Figure \ref{fig:maptask}). Because the serialization of data is CPU intensive \cite{makingsense} and it is inevitable while moving data out of Java heap memory, SCache cannot eliminate the whole phase of shuffle write. This results in a less perfomance gain in the map stage completion time.
 On the reduce side, instead, the network transfer contribute a significantly latency in shuffle read for a single task (Figure \ref{fig:reducetask}). By doing shuffle data pre-fetch for the reduce tasks in Figure \ref{fig:reducetask}, the shuffle read time decreases ~$100\%$, which means shuffle data pre-fetch almost hide all the explict network transfer in the reduce stage. In overall, SCache can help Spark decrease about $89\%$ time in the whole shuffle process. In addition, heuristic reduce tasks scheduling acheives better load balance in cluster than the Spark default FIFO scheuling which may randomly assign two heavy tasks on a single node. So that we can have a significant performance gain in the completion time of reduce stage. 
-
- 
 % \begin{figure*}
 % 	\begin{minipage}{\textwidth} 
 % 		\begin{figure}[H]
@@ -76,23 +73,23 @@ On the reduce side, instead, the network transfer contribute a significantly lat
 		
 % 	\end{minipage}
 %  \end{figure*}
-
 \begin{figure}
+	%\vspace*{-0.01cm}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.92\linewidth]{fig/tera}
-		\caption{Reduce Stage Completion Time Comparison of First Shuffle}
-		\label{fig:terasort}
+		\includegraphics[width=0.9\linewidth]{fig/groupbymapstage}
+		\caption{Map Stage Completion Time Comparison}
+		\label{fig:mapstage}
 	\end{subfigure}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.92\linewidth]{fig/tera_shuffle}
-		\caption{Shuffle Data throuth Network Comparison of Second Shuffle}
-		\label{fig:terashuffle}
+		\includegraphics[width=0.9\linewidth]{fig/groupbyreducestage}
+		\caption{Reduce Stage Completion Time Comparison}
+		\label{fig:reducestage}
 	\end{subfigure}
-	\caption{Terasort Evaluation}
+	\caption{Stage Completion Time of Single Shuffle Test}
+	\label{fig:singleshuffle}
 \end{figure}
-
 % \begin{figure}
 % \begin{subfigure}{\linewidth}
 % 	\includegraphics[width=\linewidth]{fig/groupbymapstage}
@@ -115,24 +112,22 @@ As shown in Figure \ref{fig:terasort}, we present the first shuffle as the evalu
 
 \subsection{Production Workload}
 We also evalute some shuffle heavy queries from TPC-DS \cite{tpcds}. TPC-DS benchmark is designed for modeling multiple users submitting varied queries (e.g. ad-hoc, interactive OLAP, data mining, etc.). TPC-DS contains 99 queries and is the considered as the  strandardized industry benchmark for testing big data systems. We evaluate performance of Spark with SCache by picking some of the TPC-DS queries with shuffle intensive attribute. As shown in Figure \ref{fig:tpcds}, on the horizon axis is query number, and on the vertical axis is query completion time. Spark with SCache outperforms the original Spark in almost all the queries. Furthermore, in many queries, Spark with SCache outperforms original Spark by an order of magnitude. The overall reduction portion of query time that SCache achieved is 40\% on average. Since this evaluation presents the overall job compeletion time of queries, we believe that our shuffle optimization is promising.
-
 \begin{figure}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.9\linewidth]{fig/groupbymaptask}
-		\caption{Median Task Details in Map Stages}
-		\label{fig:maptask}
+		\includegraphics[width=0.915\linewidth]{fig/tera}
+		\caption{Reduce Stage Completion Time Comparison of First Shuffle}
+		\label{fig:terasort}
 	\end{subfigure}
+	\vspace{0.08cm}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.9\linewidth]{fig/groupbyreducetask}
-		\caption{Median Task Details in Reduce Stages}
-		\label{fig:reducetask}
+		\includegraphics[width=0.915\linewidth]{fig/tera_shuffle}
+		\caption{Shuffle Data throuth Network Comparison of Second Shuffle}
+		\label{fig:terashuffle}
 	\end{subfigure}
-	\caption{Median Task Completion Time Comparison of Single Shuffle Test}
-	\label{fig:singleshuffletask}
+	\caption{Terasort Evaluation}
 \end{figure}
-\subsubsection{Single Shuffle Test}
 \subsection{Overhead of Sampling}
 In this part, we evaluate the overhead of sampling with different input data sizes on one node and cluster scales. As shown in \ref{fig:sampling}, the overhead of sampling only grows with the increasing of input size on each node. But it keep relatively stable when the cluster size scales up. It makes SCache a scalable system in cluster.
 \begin{figure*}
