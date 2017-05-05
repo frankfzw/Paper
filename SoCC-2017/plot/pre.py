@@ -163,9 +163,9 @@ def plot_range(f):
 
 
 
-#f = open('./hash_pre')
-#plot_hash(f)
-#f = open('./range_pre')
-#plot_range(f)
+f = open('./hash_pre')
+plot_hash(f)
+f = open('./range_pre')
+plot_range(f)
 f = open('./prediction_relative_error')
 plot_err(f)
