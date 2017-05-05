@@ -18,6 +18,7 @@ We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \cite{aws}.
 We first run the same single shuffle test (GroupByTest from Spark example \cite{sparksource}) as we mentioned in Figure \ref{fig:util}. As shown in Figure \ref{fig:scache_util}, the hardware utilization is captured from one node during the job. Note that since the completion time of whole job is about $50\%$ less then Spark without SCache, the duration of Figure \ref{fig:scache_util} is cut in half as well. A overlap between CPU, disk and network can be easily obeserved in Figure \ref{fig:scache_util}. That is, the I/O operations will never cut off the computing process with the fine granularity resource allocation. By running Spark with SCache, the overall CPU utilization of the cluster stays in a high level. The decoupling of shuffle write from map tasks frees the CPU earlier, which leads to a faster map task computation. The shuffle pre-fetch starts the shuffle data transfer in the early stage of map phase shift the network transfer completion time, so that the computaion of reduce can start immediately afther scheduled. And this is the main performance gain we achieved on the scope of hardware utilization by SCache.
 
 \begin{figure}
+	%\vspace*{-0.01cm}
 	\begin{subfigure}{\linewidth}
 		\centering
 		\includegraphics[width=0.9\linewidth]{fig/groupbymapstage}
@@ -79,13 +80,13 @@ On the reduce side, instead, the network transfer contribute a significantly lat
 \begin{figure}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.9\linewidth]{fig/tera}
+		\includegraphics[width=0.92\linewidth]{fig/tera}
 		\caption{Reduce Stage Completion Time Comparison of First Shuffle}
 		\label{fig:terasort}
 	\end{subfigure}
 	\begin{subfigure}{\linewidth}
 		\centering
-		\includegraphics[width=0.9\linewidth]{fig/tera_shuffle}
+		\includegraphics[width=0.92\linewidth]{fig/tera_shuffle}
 		\caption{Shuffle Data throuth Network Comparison of Second Shuffle}
 		\label{fig:terashuffle}
 	\end{subfigure}
@@ -139,10 +140,5 @@ In this part, we evaluate the overhead of sampling with different input data siz
 	\caption{TPC-DS Benchmark Evaluation}
 	\label{fig:tpcds}
 \end{figure*}
-\begin{figure}
-	\centering
-	\includegraphics[width=0.9\linewidth]{fig/sampling}
-	\caption{Sampling Overhead}
-	\label{fig:sampling}
-\end{figure}
+
 
