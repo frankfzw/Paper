@@ -31,11 +31,11 @@ x = np.asarray(x)
 y = np.asarray(y)
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
-plt.rc('xtick', labelsize=18)
-plt.rc('ytick', labelsize=18)
+plt.rc('xtick', labelsize=22)
+plt.rc('ytick', labelsize=22)
 # plt.rc('hatch', linewidth=2)
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(6.5,6.5))
 width = 9.5
 
 ax.plot(x, y, linewidth=3, color=blue)
