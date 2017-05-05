@@ -130,12 +130,17 @@ We also evalute some shuffle heavy TPC-DS\cite{tpcds} on the cluster. TPC-DS ben
 	\caption{Stage Completion Time Comparsion of Single Shuffle Test}
 	\label{fig:singleshuffle}
 \end{figure}
+\subsection{Overhead of Sampling}
+In this part, we evaluate the overhead of sampling with different input data sizes on one node and cluster scales. As shown in \ref{fig:sampling}, the overhead of sampling only grows with the increasing of input size on each node. But it keep relatively stable when the cluster size scales up. It makes SCache a scalable system in cluster.
+\begin{figure*}
+	\includegraphics[width=\textwidth]{fig/tpcds}
+	\caption{TPC-DS Benchmark Evaluation}
+	\label{fig:tpcds}
+\end{figure*}
 \begin{figure}
 	\centering
 	\includegraphics[width=0.9\linewidth]{fig/sampling}
 	\caption{Sampling Overhead}
 	\label{fig:sampling}
 \end{figure}
-\subsection{Overhead of Sampling}
-In this part, we evaluate the overhead of sampling with different input data sizes on one node and cluster scales. As shown in \ref{fig:sampling}, the overhead of sampling only grows with the increasing of input size on each node. But it keep relatively stable when the cluster size scales up. It makes SCache a scalable system in cluster.
 
