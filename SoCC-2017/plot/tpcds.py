@@ -56,7 +56,7 @@ ax.set_xlim(right=(xs[-1] + 20))
 ax.set_xticklabels(input_size, rotation=60)
 # ax.legend(loc=4, fontsize=16, frameon=False)
 ax.set_ylabel('Query Completion Time (s)', fontsize=24)
-ax.set_aspect(0.3 / ax.get_data_ratio())
+ax.set_aspect(0.23 / ax.get_data_ratio())
 plt.legend(loc=2, fontsize=24, frameon=False)
 
 # plt.savefig("tpcds.pdf")
