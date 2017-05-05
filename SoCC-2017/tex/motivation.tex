@@ -1,25 +1,27 @@
 \section{Motivation}
 
-In this section, we first study the typical shuffle characteristics (\ref{shuffle pattern}), and then spot the opportunities to achieve shuffle optmization (\ref{observation})
+In this section, we first study the typical shuffle characteristics (\ref{shuffle pattern}), and then spot the opportunities to achieve shuffle optmization (\ref{observation}).
 \subsection{Characteristic of Shuffle} \label{shuffle pattern}
 
-In large scale data parallel computing, enormous datasets are partitioned into pieces to fit the memory of each node since the very beginning of MapReduce\cite{mapreduce} model.
-Meanwhile, complicated application procedures are divided into steps. The successor steps take the output of ancestors as input to do the computation. Shuffle occurs when each successor needs 
-part of data from all ancestors' output. In order to provide a clear illustration, we define those computing on each partition of data in one step as a task. For tasks that generate shuffle output, we call
-them map task. For tasks that consume shuffle output, we call them reudce tasks. Note that one task may have both shuffle data generation and consumption in modern DAG framework. These tasks contain characteristic of both map task and reduce task. But these tasks won't change the behavior of shuffle. To avoid ambiguity, in the following paper, we will only use term of map task to represent those who produce shuffle output, and reduce task to represent those who consume shuffle output.
+In large scale data parallel computing, enormous datasets are partitioned into pieces to fit into the memory of each node.
+Meanwhile, complicated application procedures are divided into steps. The succeeding steps take the output of ancestors as computation input. Shuffle occurs when each successor needs
+part of data from all ancestors' output. It is designed to achieve an all-to-all data blocks transfer among nodes in the cluster. It exists in both MapReduce models and DAG computation models.
+For clear illustration, we define those computing on each partition of data in one step as a \textit{task}.
+Those tasks that generate shuffle outputs are called as \textit{map} tasks, and tasks consuming shuffle outputs are called as \textit{reduce} tasks.
+% Note that one task may have both shuffle data generation and consumption in modern DAG framework. These tasks contain characteristic of both map task and reduce task. But these tasks won't change the behavior of shuffle. To avoid ambiguity, in the following paper, we will only use term of map task to represent those who produce shuffle output, and reduce task to represent those who consume shuffle output.
 
-Shuffle is designed to achieve an all-to-all data blocks transfer among nodes in the cluster. It exists in both MapReduce models and DAG computation models.
+\textbf{Overview of shuffle process}. As shown in Figure \ref{fig:shuffle_process}, shuffle mainly contains two phases itself: \textit{data partition} and \textit{data transfer}. For \textit{data partition}, each map task will partition the result data (key, value pair) after execution ("Execution" block in Figure \ref{fig:shuffle_process}) into several buckets according to the partition function.
+The total number of buckets equals to the number of tasks in the next step.
+\textit{Data Transfer} can be further divided into two parts: \textit{shuffle write} and \textit{shuffle read}. \textit{Shuffle write} starts after data partition ("Data Partition" block in Figure \ref{fig:shuffle_process}) of map tasks.
+During \textit{shuffle write}, all the partitioned shuffle output data will be written into local persistent storage for fault tolerance \cite{mapreduce, spark}.
+\textit{Shuffle read} starts at the beginning of reduce tasks. These tasks might fetch the data that belong to their corresponding partitions from both remote nodes and local storage.
 
-The overview process of shuffle is presented in Figure \ref{fig:shuffle_process}. Shuffle mainly contains two phases itself: \textit{Data Partition} and \textit{Data Transfer}. For \textit{Data Partition}, each map task will partition the result data (key, value pair) into several buckets according to the partition function.
-The bucket number equals to the number of tasks in the next step. When the map tasks finish, all the shuffle output data will be written into local persistent storage for fault tolerance \cite{mapreduce, spark}.
-\textit{Data Transfer} can be further divided into two parts: \textit{Shuffle Write} and \textit{Shuffle Read}. \textit{Shuffle Write} starts after execution of map tasks and intermediate tasks. Partitioned data will  be stored on disk during \textit{Shuffle Write}. \textit{Shuffle Read} starts at the beginning of reduce tasks. These tasks will fetch the data that belong to their corresponding partitions from both remote nodes and local storage.
+%In short, shuffle is loosely coupled with application context and it's I/O intensive.
 
-In short, shuffle is loosely coupled with application context and it's I/O intensive.
-
-Since the intensive I/O operation is triggered during a shuffle, this can introduce a significant latency to the application. Reports show that, 60\% of MapReduce jobs at Yahoo
-and 20\% at Facebook are shuffle intensive workloads\cite{shufflewatcher}. For those shuffle intensive jobs, the shuffle lantency may even dominate Job Completion Time. 
+\textbf{Impact of shuffle process}. Shuffle process is I/O intensive, which might can introduce a significant latency to the application. Reports show that, 60\% of MapReduce jobs at Yahoo!
+and 20\% at Facebook are shuffle intensive workloads\cite{shufflewatcher}. For those shuffle intensive jobs, the shuffle latency may even dominate Job Completion Time (JCT).
 For instance, a MapReduce trace analysis from Facebook shows that shuffle accounts for 33\% JCT on average, up to 70\% in shuffle intensive jobs\cite{managing}.
-Meanwhile, the completion time of shuffle correlates with the performance of storage devices, network and even applications. 
+Meanwhile, the completion time of shuffle correlates with the performance of storage devices, network and even applications.
 This variation may bring a huge challenge for operators to find the correct configuration of the DAG framework.
 \begin{figure}
 	\centering
@@ -29,8 +31,10 @@ This variation may bring a huge challenge for operators to find the correct conf
 \end{figure}
 
 \subsection{Observations} \label{observation}
-Of course, shuffle is unavoidable in a DAG computing process. But \textbf{\textit{can we mitigate or even remove the overhead of shuffle?}} To find the answers, we run some representative applications on a Spark in a 5 m4.xlarge Aamzon EC2 cluster. We then capture and plot the CPU utilization, I/O throughput and tasks execution information of each node. Take the trace in Figure \ref{fig:util} as an example, which is captured during one Spark GroupByTest job. This job has 2 rounds of tasks for each node. We mark the 'Execution' phase in the figure from the launch time of the first task of this node to the execution finish timestamp of the last one. The 'Shuffle Write' phase is marked from the timestamp of the begining of the first partitioned data write. The 'Shuffle Read and Execution' phase is marked from the start of the first reduce launch timestamp.
-Figure \ref{fig:util} contains data, including two stages connected by one shuffle. By analyzing the trace combing with Spark, we propose following observations.
+Of course, shuffle is unavoidable in a DAG computing process. But \textbf{\textit{can we mitigate or even remove the overhead of shuffle?}} To find the answers, we run some typical Spark applications in a 5-node EC2 cluster with \texttt{m4.xlarge}. We then measure the CPU utilization, I/O throughput and tasks execution information of each node. Take the trace of one node running Spark \textit{GroupByTest} job in Figure \ref{fig:util} as an example. This job has 2 rounds of tasks for each node.
+We have marked out the \textit{execution} phase as from the launch time of the first task of this node to the execution finish timestamp of the last one. The \textit{shuffle write} phase is marked from the timestamp of the beginning of the first partitioned data write. The \textit{shuffle read and execution} phase is marked from the start of the first reduce launch timestamp.
+
+Figure \ref{fig:util} reveals the performance information of two stages that are connected by shuffle. By analyzing the trace combing with Spark source code\cite{} and reference publications, we propose the following observations.
 % \begin{figure*}
 % 	\includegraphics[width=\textwidth]{fig/util}
 % 	\caption{CPU utiliazation and I/O throughput of a node during a Spark single shuffle application}
@@ -39,29 +43,29 @@ Figure \ref{fig:util} contains data, including two stages connected by one shuff
 
 \begin{figure}
 	\includegraphics[width=\linewidth]{fig/util}
-	\caption{CPU utiliazation and I/O throughput of a node during a Spark single shuffle application}
+	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
 	\label{fig:util}
 \end{figure}
 
-\subsubsection{Multi-rounds tasks in each stages}\label{multi}
-Both experience and DAG framework manuals recommend that multi-rounds execution of each stage will benefit the performance of applications.
+\subsubsection{Coarse Granularity Resource Allocation}
+In general, CPU and memory are bound with a schedule slot in DAG resource scheduler. When a task is scheduled to a slot, it will not release until it reaches the end of task. In Figure \ref{fig:util}, the resource of Spark executor will be released at the ending of \textit{shuffle write}. On the reduce side, though in the context of Spark, the reduce task can do computation while fetching data, the transfer of first few blocks may still introduce an explicit I/O delay. On the other hand, shuffle is I/O intensive job. It doesn't involved CPU and application context. Both \textit{shuffle write} and \textit{shuffle read} occupy the slot without using CPU. The current coarse slot --- task mapping results in an inconsistency between resource demands and allocation and a low resource utilization. To break this inconsistency, a finer granularity resource allocation scheme must be provided.
+
+\subsubsection{Synchronized Shuffle Read}
+Combining with traces from other nodes, we find that almost all reduce tasks start \textit{shuffle read} simultaneously (i.e. The rising network utilization during \textit{shuffle read and execution} in Figure \ref{fig:util}). The synchronized \textit{shuffle read} requests burst data into network. As shown in Figure \ref{fig:util}, the bursty data transfer stresses on network bandwidth, which may result in network congestion among the cluster. The  bursty demands of network bandwidth might delay the \textit{shuffle read} and hurt the performance of reduce stage. Data reported in previous work\cite{coflow, managing} also prove that the network transfer can introduce significant overhead in DAG computing.
+
+\subsubsection{Multi-round Tasks Execution}\label{multi}
+Both experience and DAG framework manuals recommend that multi-round execution of each stage will benefit the performance of applications.
 For example, Hadoop MapReduce Tutorial \cite{hadooptutorial} suggests that \textit{10-100 maps per-node} and \textit{0.95 or 1.75 $\times$ no. of nodes $\times$ no. of maximum container per node} seem to be the right level of parallelism. Spark Configuration also recommends 2-3 tasks per CPU core in the cluster\cite{sparkconf}.
-We have two rounds of tasks in job of Figure \ref{fig:util} to process about 70GB data. Figure \ref{fig:util} shows that the second phase of shuffle -- \textit{Data Transfer} will start until the reduce stage starts.
-But the shuffle data will become available as soon as the execution of one task is finished. Though in the context of Spark, the reduce task can do computation while fetching data, the uncontrolled network congestion may still hurt the performance. However, if the destination of the shuffle output of each task is aware, the property of multi-rounds can be leveraged to do \textit{Data Transfer} ahead of reduce stage.
-
-\subsubsection{Tight Copule between Shuffle and Computation}
-Another information we get from the trace is that shffle should be decoupled from task which is a execution unit in both Spark and Hadoop MapReduce. In general, CPU and memory are binded as a schedule slot in DAG resource scheduler. When a task is scheduled to a slot, it won't release until it reaches the end of task. In Figure \ref{fig:util}, the resource of Spark executor will be realsed at the ending of 'Shffle Write'.
-But CPU becomes idle almost as soon as the 'Exectuion' is finished. On the other hand, shuffle is I/O intensive job. It doesn't involved CPU and application context. If the shffle can be decopled from task, the slot can be relased after 'Execution' phase. The early release can benefit other tasks to achieve better overall performance of the DAG framework.
-
-\subsubsection{Variance of I/O Performance}
-When we look into the performance of disk and network in our test case, there is huge variance. Since we use the standard EBS as our backend storage for the EC2 instances, the I/O performance of the disk is poor. 
-At the same time, the bandwidth of each instance is not specified from Amazon. But the utilization in Figure\ref{fig:util} refers that the bandwidth is about 300Mbps. In this case, the bottleneck of shuffle is disk, which introduces a significant latency for the application. Vice versa, in some cases, the congestion of network may also become the bottleneck of shuffle\cite{varys}. The uncertainty about the I/O performance causes a huge challenge for optimizing the DAG computing in the cluster. For network latency, the most we can do is to mitigate the transfer delay. As for disk write, we believe it's not necessary for today's cluster. Recall that the persistence of shuffle data is used only for reduce fault tolerence, but the mean time to failure(MTTF) for a server is counted in the scale of year\cite{tachyon}. The MTTF is exponential comparing with the duration of a shuffle, so we believe the disk write is unnecessary in today's data center. 
-
-\subsubsection{Relatively Small Size of Shuffle Data}\label{shufflesize}
-In order to accelearate computation, Spark will put all the input data set for a task into memory. Comparing to the input dataset, size of shuffle data is relatively small. We present two typical applications on Spark to show the relationship between shuffle data comparing with the input dataset in Figure \ref{fig:shuffle_size}. Although TeraSort\cite{terasort} is known as a shuffle intensive job, in a 10GB input TeraSort, the shuffle size is less than 3GB. When it's mapped to a 5-nodes cluster, it only takes about 500MB memory (\~25\% of input size for each node) to cache the shuffle data in memory. The data reported in \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as a factor of 5-10. This is another reason that disk should not be involved in the whole shuffle procedure.
+In Figure \ref{fig:util} we also run two rounds of tasks to process data of about $70$GB. As shown in Figure \ref{fig:util}, during the map stage, the network is idle (i.e. Network utilization during \textit{execution} and \textit{shuffle write}). Since the shuffle data becomes available as soon as the execution of one map task is finished, if the destination of the shuffle output of each task can be known in priori, the property of multi-round can be leveraged to do \textit{shuffle read} ahead of reduce stage.
 
 
-Based on these observations, it's straightforward to come up with an optimization that use memory to store the shuffle data and overlap the I/O operations of shuffle
-by leveraging multi-rounds property of DAG computing. In order to achieve this optimization, we have to decouple shuffle from task and 
-perform pre-fetch as soon as each output of map task and intermediate task is available. But is this feasible? We try to answer this question
-in the following sections.
+\subsubsection{Unefficient Persistent Storage Operation}
+When we look into the detail I/O operation of shuffle, we find that operations on persistent storage of shuffle are unefficient. There are at least two persistent storage operations for each shuffle data block. At first, Spark will write shuffle data to the persistent storage after map task execution(i.e. \textit{Shuffle Write} in Figure \ref{fig:util}). During the \textit{shuffle read}, Spark will then read shuffle data from remote and local presistent storage, which is the second operation. The persistence of shuffle data was designed for fault tolerance. But we believe it's not necessary for today's cluster. Recall that shuffle data only exist in a short time scale. But the Mean Time To Failure(MTTF) for a server is counted in the scale of year\cite{tachyon}, which is exponential comparing with the duration of a shuffle. In addition, the capacity of memory and network has been increasing rapidly in recent years. As a result, numbers of memory based distributed storage system have been proposed\cite{memcached, tachyon, ramcloud}. On the other hand, the size of shuffle data is relatively small. For example, shuffle size of Spark Terasort\cite{spark-tera} is less than 25\% of input data. The data reported in \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as a factor of 5-10. We argue that removing persistent storage and using memory to achieve shuffle fault tolerance is feasible and efficient.
+
+Based on these observations, it is straightforward to come up with an optimization that uses memory to store the shuffle data and start \textit{shuffle read} ahead of reduce stage to overlap the I/O operations in \textit{multi-round} of DAG computing. To achieve this optimization:
+\begin{itemize}
+	\item Shuffle should be taken over to provide a fine granularity scheduling scheme.
+	\item Reduce tasks should be pre-scheduled without launching to achieve shuffle data pre-fetch.
+	\item Shuffle process should be decoupled to provide a cross-framework optimization
+\end{itemize}
+In the following section, we elaborate the methodologies to achieve three design goals.
