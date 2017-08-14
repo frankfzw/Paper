@@ -66,9 +66,9 @@ The simplest way of pre-scheduling is mapping tasks to different nodes evenly.  
 \subsubsection{Shuffle Output Prediction}\label{shuffleprediction}
 The failure of random mapping was obviously caused by application context (e.g. shuffle data size) unawareness. To avoid the `bad' scheduling results, we have to leverage the application context as assistance. The optimal schedule decision can be made under the awareness of shuffle dependencies number, partition number and shuffle size for each partition. The first two of them can be easily extracted from DAG information. To achieve a better scheduling result, the shuffle size for each partition should be predicted during the initial phase of map tasks.
 
-According to the DAG computing process, the shuffle size of each reduce task is decided by input data, map task computation, and hash partitioner. For each map task, it produces a data block for each reduce task, like `1-1' in Figure \ref{fig:shuffle}. `1-1' means it is produced by \textit{map task 1} for \textit{reduce task 1}. For Hadoop MapReduce, the shuffle input for each reduce task can be predicted with decent accuracy by liner regression model based on observation that the ratio of map output size (e.g. map output in Figure \ref{fig:shuffle}) and input size is invariant given the same job configuration \cite{ishuffle, predict}.
+According to the DAG computing process, the shuffle size of each reduce task is decided by input data, map task computation, and hash partitioner. For each map task, it produces a data block for each reduce task. The size of each reduce partition can be calculated $reduceSize_i = \sum_{j=0}^{m} {BlockSize_{ji}}$. $m$ is the number of map tasks. $BlockSize_{ji}$ represents the size of block which is produced by \textit{map task j} for \textit{reduce task i}(e.g., block `1-1' in Figure \ref{fig:shuffle}). For Hadoop MapReduce, the $BlockSize_{ji}$ can be predicted with decent accuracy by liner regression model based on observation that the ratio of map output size (e.g. map output in Figure \ref{fig:shuffle}) and input size is invariant given the same job configuration \cite{ishuffle, predict}.
 
-But the sophisticated DAG computing framework like Spark introduces more uncertainties. For instance, the reduce stage in Spark has more number of tasks than Hadoop MapReduce. More importantly, the customized partitioner might bring huge inconsistency between observed map output blocks distribution and the final reduce input distribution. To find out the connection among three factors, we use different datasets with different partitioners. The result is presented in Figure \ref{fig:dis}. We normalize three sets of data to $0-1$ to fit in one figure. In Figure \ref{fig:hash_pre}, we use a random input dataset with the hash partitioner. In Figure \ref{fig:range_pre_sample}, we use a skew dataset with the range partitioner of Spark \cite{sparksource}.
+But the sophisticated DAG computing framework like Spark introduces more uncertainties. For instance, the reduce stage in Spark has more number of tasks than Hadoop MapReduce. More importantly, the customized partitioner might bring huge inconsistency between observed map output blocks distribution and the final reduce input distribution as presented in Figure \ref{fig:dis}. We use different datasets with different partitioners and normalize three sets of data to $0-1$ to fit in one figure. In Figure \ref{fig:hash_pre}, we use a random input dataset with the hash partitioner. In Figure \ref{fig:range_pre_sample}, we use a skew dataset with the range partitioner of Spark \cite{sparksource}.
 The observed map outputs are randomly picked. As we can see, in hash partitioner, the distribution of observed map output is close to the final reduce input distribution. The prediction results also turn out to be good. However, the huge inconsistency between final reduce distribution and observed distribution results in a deviation in linear regression model.
 % Several map outputs (marked as Map Output in Figure \ref{fig:shuffle}) are picked as observation objects to train the model and than predict the final reduce distribution.
 
@@ -83,6 +83,16 @@ The observed map outputs are randomly picked. As we can see, in hash partitioner
 To handle this inconsistency, we introduce another methodology named weighted reservoir sampling. The classic reservoir sampling is designed for randomly choosing \textit{k} samples from \textit{n} items, where \textit{n} is either a very large or an unknown number \cite{reservoir}. For each partition of map task, we use reservoir sampling to randomly pick $s \times p$ of samples, where $p$ is the number of reduce tasks and $s$ is a tunable number. The number of input data partition and reduce tasks can be easily obtained from the DAG information. In Figure \ref{fig:range_pre_sample}, we set $s$ equals $3$. After that, the map function is called locally to process the sampled data (\textit{sampling} in Figure \ref{fig:shuffle}). The final sampling outputs are collected with the size of each map partition which is used as weight for each set of sample. For each reduce, the predicted size $reduceSize_i$
 
 As we can see in Figure \ref{fig:range_pre_sample}, the result of sampling prediction is much better even in a very skew scenario. The variance of the normalized between sampling prediction and reduce distribution is because the standard deviation of the prediction result is relatively small compared to the average prediction size, which is $0.0015$ in this example. Figure \ref{fig:prediction_relative_error} further proves that the sampling prediction can provide precise result even in the dimension of absolute shuffle partition size. On the opposite, the result of linear regression comes out with huge relative error.
+
+During the phase of shuffle output prediction, the composition of each reduce partition is calculated as well for a better locality scheduling. We define $prob_i$ as
+
+\begin{equation}
+\label{equationsample}
+\begin{aligned}
+	prob_i = \max_{0 \leq j \leq n} \left( BlockSize_{ji} / size_i \right)\\
+    {\left( n = \text{partition number of input data} \right)}
+\end{aligned}
+\end{equation}
 
 \begin{minipage}{\columnwidth}
 \begin{algorithm}[H]
@@ -149,17 +159,7 @@ However, sampling prediction trade accuracy with extra overhead in DAG computing
 \subsubsection{Heuristic MinHeap Scheduling}\label{h-minheap}
 In order to achieve the uniform load on each node while reducing the network traffic, we present a heuristic MinHeap (\ref{hminheap}) as the scheduling algorithm for single shuffle. It takes predicted shuffle distribution, locality information and DAG information as input. Unlike the na\"{i}ve Spark scheduling algorithm, these information helps the scheduler make a more balanced task --- node mapping, which accelerates the reduce stage. This is the by-product optimization harvested from shuffle size prediction.
 
-As for the input of $schedule$ function in Algorithm \ref{hminheap}, $m$ is the partition number of input data; $h$ is the array of nodes ID in cluster; $p\_reduces$ is the predicted reduce matrix. Each row in $p\_reduces$ contains $r\_id$ as reduce partition ID; $size$ as predicted size of this partition; $prob$ as the maximum composition portion of reduce data; $host$ as the node ID that produce the maximum portion of reduce data. The $prob$ of reduce $i$ is calculated by 
-
-\begin{equation}
-\label{equationsample}
-\begin{aligned}
-	prob_i = \max_{0 \leq j \leq n} \left( BlockSize_{ji} / size_i \right)\\
-    {\left( n = \text{partition number of input data} \right)}
-\end{aligned}
-\end{equation}
-
-As for $M$, it is a matrix consists $hostid$, $size$ (total size of reduce data on this node) and an array of $r\_id$.
+As for the input of $schedule$ function in Algorithm \ref{hminheap}, $m$ is the partition number of input data; $h$ is the array of nodes ID in cluster; $p\_reduces$ is the predicted reduce matrix. Each row in $p\_reduces$ contains $r\_id$ as reduce partition ID; $size$ as predicted size of this partition; $prob$ as the maximum composition portion of reduce data; $host$ as the node ID that produce the maximum portion of reduce data. As for $M$, it is a matrix consists $hostid$, $size$ (total size of reduce data on this node) and an array of $r\_id$.
 
 This algorithm can be divided into two rounds. In the first round (i.e., the first $while$ in Algorithm \ref{hminheap}), the reduce tasks are first sorted by size in a descending order. For hosts, we use a min-heap to maintain the priority by size of assigned tasks. So that the heavy tasks can be distributed evenly in the cluster.
 % After the scheduling, the completion time of reduce stage is close to the optimal. \textcolor{red}{may need to add math prove between this and optimal}.
