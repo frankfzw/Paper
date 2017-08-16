@@ -107,36 +107,28 @@ This parameter is used to achieve a better locality while performing shuffle sch
 	\begin{algorithmic}[1]
 	\small
 	\Procedure{schedule}{$m, h, p\_reduces$}
-		\State $R\gets$ sort $p\_reduces$ by size
-		\State $M\gets$ mapping $\left\{ host\_id \rightarrow \left( \left[ rid \right], size \right) \right\}$
-		\State $rid\gets$ len$\left(R\right)$
-		\Comment{Current scheduled reduce id}
-		\While{$rid \geq 0$}
+		\State $R\gets$ sort $p\_reduces$ by size in descending order
+		\State $M\gets$ min-heap $\left\{ host\_id \rightarrow \left( \left[ reduce \right], size \right) \right\}$
+		\State $idx\gets$ len$\left(R\right) - 1$
+		\While{$idx \geq 0$}
 		\Comment{Schedule reduces by MinHeap}
-		\State Update $M\left[0\right].size$
-		\State Assign $R\left(rid\right)$ to $M\left[0\right]$
-		\State sift\_down$\left(M\left[0\right]\right)$
-		\State
-		\Comment{Use min-heap according to size in $M$}
-		\State $rid\gets rid-1$
+		\State $M\left[0\right].size += R\left[idx\right].size$
+		\State $M\left[0\right].reduce.append\left(R\left[idx\right]\right)$
+		\State $R\left[idx\right].assigned\_host \gets M \left[0\right].host\_id$
+		\State Sift down $M\left[0\right]$ by $size$
+		\State $idx\gets idx-1$
 		\EndWhile
 		\State $max\gets$ maximum size in $M$
-		\State $rid\gets$ len$\left(R\right)$
-		\While{$rid \geq 0$}
+		\State Convert $M$ to mapping $\left\{ host\_id \rightarrow \left( \left[ rid\_arr \right], size \right) \right\}$
+		\ForAll{$reduce$ in $R$}
 		\Comment{Heuristic swap by locality}
-		\State $prob\gets$ max composition portion of $rid$
-		\State $norm\gets \left(prob-1/m\right)/\left(1-1/m\right)/10$
-		\State
-		\Comment{Use $norm$ to limit the performance degradation in tasks swap}
-		\State $t\_h\gets$ host that produces $prob$ data of $rid$
-		\State $c\_h\gets$ current assigned host by MinHeap
-		\If{$t\_h == c\_h$}
-			\State Seal the assignment of $rid$ in $M$
-		\Else
-			\State swap\_tasks$\left(rid, c\_h, t\_h, max, norm\right)$
-		\EndIf
-		\State $rid\gets rid-1$
-		\EndWhile
+			\If{$reduce.assigned\_id != reduce.host\_id$}
+				\State $p\gets reduce.prob$
+				\State $norm\gets \left(p-1/m\right)/\left(1-1/m\right)/10$
+				\State $upper\_bound \gets \left(1 + norm) \times max$
+				\State SWAP\_TASKS$\left(M, reduce, upper\_bound\right)$
+			\EndIf
+		\EndFor
 		% \Comment{$m$ is the number of input data}
 		% \Comment{$r$ is partition number of reduces}
 		% \Comment{$hosts$ is array of (hostid, partitionids[], size)}
@@ -144,17 +136,13 @@ This parameter is used to achieve a better locality while performing shuffle sch
 		% \Comment{$pSize$ is $r$ size array of predicted size of reduces}
 		\Return $M$
 	\EndProcedure
-	\Procedure{swap\_tasks}{$rid, c\_h, t\_h, max, norm$}
-	\State $num\gets$ number of reduces
-	\State selected from $t\_h$ that $total\_size$ won't
-	\State make both $c\_h$ and $t\_h$ exceed $\left(1+norm\right)*max$
-	\State after swapping
-	\If{$num == 0$}
-		\State return
-	\Else
-		\State \# Swap $nums$ reduces with $rid$ between $c\_h$ and $t\_h$
-		\State \# Update size of $t\_h$ and $c\_h$
-	\EndIf
+	\Procedure{swap\_tasks}{$M, reduce, upper\_bound$}
+		\State $reduces \gets M\left[reduce.host\_id\right].reduce$	
+		\State $candidates \gets$ Select from $reduces$ that makes total size closest to $reduce.size$
+		\State $size\_host \gets M\left[reduce.host\_id\right].size - sizeOf\left(candidates\right) + reduce.size$
+		\State $size\_assigned \gets M\left[reduce.assigned\_id\right].size + sizeOf\left(candidates\right) - reduce.size$
+		\If{$size\_host \leq upper\_bound$ \textbf{and} $size\_assigned \leq upper\_bound$}
+		\EndIf
 	\EndProcedure
 	\end{algorithmic}
 \end{algorithm}
@@ -164,7 +152,7 @@ This parameter is used to achieve a better locality while performing shuffle sch
 \subsubsection{Heuristic MinHeap Scheduling}\label{h-minheap}
 In order to achieve the uniform load on each node while reducing the network traffic, we present a heuristic MinHeap (\ref{hminheap}) as the scheduling algorithm for single shuffle. It takes predicted shuffle distribution, reduce composition (i.e., $prob_i$) and DAG information as input. Unlike the na\"{i}ve Spark scheduling algorithm, these information helps the scheduler make a more balanced task --- node mapping, which accelerates the reduce stage. This is the by-product optimization harvested from shuffle size prediction.
 
-As for the input of $schedule$ function in Algorithm \ref{hminheap}, $m$ is the partition number of input data; $h$ is the array of nodes ID in cluster; $p\_reduces$ is the predicted reduce matrix. Each row in $p\_reduces$ contains $r\_id$ as reduce partition ID; $size$ as predicted size of this partition; $prob$ as the maximum composition portion of reduce data; $host$ as the node ID that produce the maximum portion of reduce data. As for $M$, it is a matrix consists $host\_id$, $size$ (total size of reduce data on this node) and an array of $r\_id$.
+As for the input of $schedule$ function in Algorithm \ref{hminheap}, $m$ is the partition number of input data; $h$ is the array of nodes ID in cluster; $p\_reduces$ is the predicted reduce matrix. Each row in $p\_reduces$ contains $rid$ as reduce partition ID; $size$ as predicted size of this partition; $prob$ as the maximum composition portion of reduce data; $host\_id$ as the node ID that produces the maximum portion of reduce data, and $assigned\_id$ as the node ID assigned by Algorithm \ref{hminheap}. As for $M$, it is consists $host\_id$, $size$ (total size of reduce data on this node) and an array of $rid$.
 
 This algorithm can be divided into two rounds. In the first round (i.e., the first $while$ in Algorithm \ref{hminheap}), the reduce tasks are first sorted by size in a descending order. For hosts, we use a min-heap to maintain the priority by size of assigned tasks. So that the heavy tasks can be distributed evenly in the cluster.
 % After the scheduling, the completion time of reduce stage is close to the optimal. \textcolor{red}{may need to add math prove between this and optimal}.
