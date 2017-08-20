@@ -15,8 +15,8 @@ green = '#2E8B57'
 light_blue = '#87CEFA'
 light_green = '#CCFFCC'
 
-# f = open('./util')
-f = open('./scache_util')
+f = open('./util')
+# f = open('./scache_util')
 
 net = []
 cpu = []
@@ -120,8 +120,8 @@ ax.legend(lines, labels, loc=1, fontsize=18,
         frameon=False)
 
 
-# plt.savefig("util.pdf")
-plt.savefig("scache_util.pdf")
+plt.savefig("util.pdf")
+# plt.savefig("scache_util.pdf")
 # size = fig.get_size_inches()
 # print size
 # 
