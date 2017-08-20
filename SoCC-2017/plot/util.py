@@ -94,7 +94,7 @@ line_net = ax2.plot(xs, net,
             ls='--',
             color=green,
             label='Network TX')
-ax2.set_ylabel('Throuthput (MB/s)', fontsize=18)
+ax2.set_ylabel('Throughput (MB/s)', fontsize=18)
 
 ax.annotate(s='', xy=(exe_x,0.2), xytext=((exe_x+exe_width),0.2), arrowprops=dict(arrowstyle='<->'))
 ax.text(exe_x+2, 0.22, 'Execution', fontsize=20)
