@@ -84,7 +84,7 @@ ax.barh(input_size + width, spark_reduce, width,
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Redcue Stage Completion Time (s)', fontsize=22)
+ax.set_xlabel('Reduce Stage Completion Time (s)', fontsize=22)
 ax.set_ylabel('Input Size (GB)', fontsize=22)
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
