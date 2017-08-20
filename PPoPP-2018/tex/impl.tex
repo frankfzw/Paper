@@ -21,7 +21,7 @@ For RDDs with shuffle dependencies, Spark DAG scheduler will consult SCache mast
 When the scheduled reduce tasks start, the shuffle input data can be fetched from reserved memory in SCache worker through daemon process. As soon as the data is consumed by the reduce task, it will be flushed to the disk.
 
 \subsubsection{Reservoir Sampling}\label{sampling}
-If the submitted shuffle dependencies contain a range partitioner or a customized non-hash partitioner, the SCache master will send a sampling request to the daemon in Spark driver. The daemon then inserts a sampling job with the corresponding RDD. This sampling job uses a reservoir sampling algorithm \cite{reservoir} on each partition of RDD. For the sample number, we set the size to $3 \times number\ of\ partitions$ for balancing overhead and accuracy (it can be tuned by configuration). The sampling job randomly selects some items and performs a local shuffle with partitioner (see Figure \ref{fig:sample}). At the same time, the items number is counted as the weight. These sampling data will be aggregated by reduce ID on SCache master. The prediction of reduce size can be easily computed by Equation \ref{equationsample}. After the prediction, SCache master will call Algorithm \ref{mhminheap} and \ref{hminheap} to do the scheduling.
+If the submitted shuffle dependencies contain a range partitioner or a customized non-hash partitioner, the SCache master will send a sampling request to the daemon in Spark driver. The daemon then inserts a sampling job before the corresponding RDD. The sampling job uses a reservoir sampling algorithm \cite{reservoir} on each partition of RDD. For the sample number, we set the size to $3 \times number\ of\ partitions$ for balancing overhead and accuracy (it can be tuned by configuration). The sampling job randomly selects some items and performs a local shuffle with partitioner (see Figure \ref{fig:sample}). At the same time, the items number is counted as the weight. These sampling data will be aggregated by reduce ID on SCache master to predict the reduce partition size. After the prediction, SCache master will call Algorithm \ref{mhminheap} and \ref{hminheap} to do the scheduling.
 
 \begin{figure}
 	\centering
@@ -31,7 +31,7 @@ If the submitted shuffle dependencies contain a range partitioner or a customize
 \end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.7\linewidth]{fig/sample}
+	\includegraphics[width=0.6\linewidth]{fig/sample}
 	\caption{Reservoir Sampling of One Partition}
 	\label{fig:sample}
 \end{figure}
