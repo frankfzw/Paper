@@ -55,20 +55,20 @@ line_cpu = ax.plot(xs, cpu,
             label='CPU Utilization')
 # ax.set_xticks(xs + width)
 # plot exe bar util
-# exe_x = 10
-# exe_width = 18
-# s_write_x = 24
-# s_write_width = 15
-# s_read_x = 40
-# s_read_width = 43
+exe_x = 10
+exe_width = 18
+s_write_x = 24
+s_write_width = 15
+s_read_x = 40
+s_read_width = 43
 
 # plot exe bar scache
-exe_x = 8
-exe_width = 11
-s_write_x = 17.5
-s_write_width = 3.5
-s_read_x = 21
-s_read_width = 6
+# exe_x = 8
+# exe_width = 11
+# s_write_x = 17.5
+# s_write_width = 3.5
+# s_read_x = 21
+# s_read_width = 6
 
 ax.bar(left=[exe_x,s_write_x,s_read_x], height=[1.1,1.1,1.1], width=[exe_width,s_write_width,s_read_width],
         linewidth=0, color=[light_blue, light_orange, light_green],
@@ -100,16 +100,16 @@ ax.annotate(s='', xy=(exe_x,0.2), xytext=((exe_x+exe_width),0.2), arrowprops=dic
 ax.text(exe_x+2, 0.22, 'Execution', fontsize=20)
 
 # plot util text
-# ax.annotate(s='', xy=(s_write_x,0.75), xytext=((s_write_x+s_write_width),0.75), arrowprops=dict(arrowstyle='<->'))
-# ax.text(s_write_x, 0.77, 'Shuffle Write', fontsize=16)
-# ax.annotate(s='', xy=(s_read_x,0.96), xytext=((s_read_x+s_read_width),0.96), arrowprops=dict(arrowstyle='<->'))
-# ax.text(s_read_x + 5, 0.98, 'Shuffle Read and Execution', fontsize=16)
+ax.annotate(s='', xy=(s_write_x,0.75), xytext=((s_write_x+s_write_width),0.75), arrowprops=dict(arrowstyle='<->'))
+ax.text(s_write_x, 0.77, 'Shuffle Write', fontsize=16)
+ax.annotate(s='', xy=(s_read_x,0.96), xytext=((s_read_x+s_read_width),0.96), arrowprops=dict(arrowstyle='<->'))
+ax.text(s_read_x + 5, 0.98, 'Shuffle Read and Execution', fontsize=16)
 
 # plot scache text
-ax.annotate(s='', xy=(s_write_x,0.5), xytext=((s_write_x+s_write_width),0.5), arrowprops=dict(arrowstyle='<->'))
-ax.text(s_write_x-0.5, 0.52, 'Shuffle Write', fontsize=16)
-ax.annotate(s='', xy=(s_read_x,0.98), xytext=((s_read_x+s_read_width),0.98), arrowprops=dict(arrowstyle='<->'))
-ax.text(s_read_x, 1, 'Reduce Execution', fontsize=16)
+# ax.annotate(s='', xy=(s_write_x,0.5), xytext=((s_write_x+s_write_width),0.5), arrowprops=dict(arrowstyle='<->'))
+# ax.text(s_write_x-0.5, 0.52, 'Shuffle Write', fontsize=16)
+# ax.annotate(s='', xy=(s_read_x,0.98), xytext=((s_read_x+s_read_width),0.98), arrowprops=dict(arrowstyle='<->'))
+# ax.text(s_read_x, 1, 'Reduce Execution', fontsize=16)
 # ax2.set_aspect((350 / 1.1) * 0.3 / ax2.get_data_ratio())
 # plt.legend(loc=1, fontsize=18, frameon=False)
 lines = line_cpu + line_net + line_disk
