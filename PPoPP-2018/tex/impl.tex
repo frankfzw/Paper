@@ -47,17 +47,19 @@ For those incomplete units, SCache will mark them as the lowest priority.
 % Following the all-or-noting constraint can maximum the improvement in stage completion time by using reserved memory efficiently.
 
 \subsubsection{Context-Aware-Priority Constraint}
-When the size of cached shuffle data exceeds the reserved memory, SCache should pick up victims and flush them to disk.
-SCache master first searches for the incomplete units and flush all belonging blocks to disk cluster-widely.
+Unlike the traditional cache replacement schemes such as MIN \cite{min}, the cached shuffle data will only be used once (without failure) in DAG computing. That is, the effort of improving hit rate in most legacy schemes can not benefit DAG application, while their approaches can easily violate the all-or-nothing constraint.
+SCache also leverages application context to select victim storage units when the reserved memory is full.
 
-But what if all the units are completed in the cluster? Traditional cache replacement schemes, such as MIN \cite{min}, only maximize cache hit ratio without considering the application context in DAG computing. But the cached shuffle blocks are only read exactly once (without failure), the hit ratio is actually meaningless in this scenario.
-In addition, directly applying them might violate the all-or-nothing constraint.
-To decide the priorities among units, SCache makes decision in two dimensions -- \textit{inter-shuffle units} and \textit{intra-shuffle unit}.
+At first, SCache master searches for the incomplete units and flush all belonging blocks to disk cluster-widely.
+
+If all the units are completed, SCache selects victims based on two factors --- \textit{inter-shuffle units} and \textit{intra-shuffle unit}.
 \begin{itemize}[noitemsep]
-	\item Inter-shuffle units: SCache master follows the scheduling scheme of Spark to determine the inter-shuffle priority. For a FAIR scheduler, Spark balances the resource among task sets, which leads to a higher priority for those with more remaining tasks. The more remaining tasks a stage have, the more storage units left unconsumed. So SCache sets priorities from high to low in a descending order of remaining storage units of a shuffle unit. For a FIFO scheduler, Spark schedules the task set that is submitted first. So SCache sets the priorities according to the submit time of each shuffle unit.
-	\item Intra-shuffle unit: SCache also needs to decide the priority among storage units inside a shuffle unit. According to the task scheduling inside a task set of Spark, the tasks with smaller ID will be scheduled firstly under one locality level. Based on this, SCache can assign the storage unit with larger task ID with lower priority.
+	\item Inter-shuffle units: SCache master follows the scheduling scheme of Spark to determine the inter-shuffle priority. For a FAIR scheduler, Spark balances the resource among task sets, which leads to a higher priority for those having more tasks unfinished. So SCache sets priorities from high to low in a descending order of remaining storage units of a shuffle unit. For a FIFO scheduler, Spark schedules the task set that is submitted first. So SCache sets the priorities according to the submit time of each shuffle unit.
+	\item Intra-shuffle unit: SCache also needs to decide the priority among storage units inside a shuffle unit. According to the task scheduling inside a task set of Spark, the tasks with smaller ID will be scheduled firstly. Based on this, SCache can assign the lower priority to storage units with larger task ID.
 \end{itemize}
-In a word, SCache selects the shuffle unit with the lowest inter-shuffle priority and evicts the storage units according to intra-shuffle priority.
+
+
+
 
 
 
