@@ -66,7 +66,7 @@ We argue that the memory capacity is large enough to store the short-living shuf
 Based on these observations, it is straightforward to come up with an optimization that starts shuffle read ahead of reduce stage to overlap the I/O operations in \textit{multi-round} of DAG computing and uses memory to store the shuffle data to further accelerate shuffle. To achieve this optimization:
 \begin{itemize}
 	\item Shuffle process should be decoupled from task execution to provide a fine granularity scheduling scheme.
-	\item Reduce tasks should be pre-scheduled without launching to achieve shuffle data pre-fetch.
+	\item Reduce tasks should be pre-scheduled without launching to achieve shuffle data pre-fetching.
 	\item Shuffle process should be taken over and managed outside DAG frameworks to provide a cross-framework optimization
 \end{itemize}
 In the following section, we elaborate the methodologies to achieve three design goals.

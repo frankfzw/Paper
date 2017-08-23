@@ -22,7 +22,7 @@ On the reduce side, shuffle read is decoupled by pre-fetching shuffle data to lo
 %To this end, all I/O operations are managed outside of the DAG framework, and the slot is occupied only by the CPU intensive phases of task.
 
 \subsection{Pre-schedule with Application Context}
-The pre-scheduling and pre-fetch starts when the collected shuffle data exceeds the threshold.
+The pre-scheduling and pre-fetching starts when the collected shuffle data exceeds the threshold.
 This is the main challenge toward the optimization. The task --- node mapping is not determined until tasks are scheduled by scheduler of DAG framework. But as soon as they are scheduled, slots will be occupied to launch them. On the other hand, shuffle data cannot be pre-fetched without knowing the task --- node mapping.
 To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic algorithms. That is, the task --- node mapping is established ahead of DAG framework scheduler, and it is enforced to DAG scheduler before the real scheduling.
 
