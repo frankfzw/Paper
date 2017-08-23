@@ -75,7 +75,7 @@ The main challenge to achieve this optimization is \textit{pre-scheduling reduce
 The second challenge is the \textit{in-memory data management}. To prevent shuffle data touching the disk, SCache leverages extra memory to store the shuffle data. However, the memory is a precious resource for DAG computing. To minimize the reserved memory while maximizing the performance gain of optimization and memory utilization, we propose two constraints: all-or-nothing and context-aware (Section \ref{memorymanage}).
 %The memory management scheme follows these two contraints to switch shuffle data blocks on and off reserved memory.
 
-We have implemented and open source SCache \footnotetext[1]{The URL is omitted due to double-blinded review requirements.} and customized Apache Spark \cite{apachespark}. The performance of SCache is evaluated with both simulations and testbed experiments on a 50-node Amazon EC2 cluster. We conduct basic test GroupByTest. We also evaluate Terasort \cite{spark-tera} benchmark and standard workloads like TPC-DS \cite{tpcds} for multi-tenant modeling. In a nutshell, SCache can eliminate explicit shuffle process by at most $89\%$ in varied application scenarios.
+We have implemented and open source SCache \footnote{The URL is omitted due to double-blinded review requirements.} and customized Apache Spark \cite{apachespark}. The performance of SCache is evaluated with both simulations and testbed experiments on a 50-node Amazon EC2 cluster. We conduct basic test GroupByTest. We also evaluate Terasort \cite{spark-tera} benchmark and standard workloads like TPC-DS \cite{tpcds} for multi-tenant modeling. In a nutshell, SCache can eliminate explicit shuffle process by at most $89\%$ in varied application scenarios.
 
 
 

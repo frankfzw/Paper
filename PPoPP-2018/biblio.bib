@@ -7,26 +7,45 @@
   organization={USENIX Association}
 }
 
-@misc{hadoop,
-  title = {Apache Hadoop},
-  howpublished = "\url{http://hadoop.apache.org/}",
-  lastaccessed = "August 20, 2017"
-}
-
-@misc{apachespark,
-  title = {Apache Spark},
-  howpublished = "\url{http://spark.apache.org/}"
+@online {hadoop,
+    author = "Apache",
+    year   = "2017",
+    title  = "Apache Hadoop",
+    url    = "http://hadoop.apache.com/"
 }
 
 
-@misc{spark-tera,
-  title = {Spark Terasort},
-  howpublished = "\url{https://github.com/ehiggs/spark-terasort}"
+@article{apachespark,
+ author = {Zaharia, Matei and Xin, Reynold S. and Wendell, Patrick and Das, Tathagata and Armbrust, Michael and Dave, Ankur and Meng, Xiangrui and Rosen, Josh and Venkataraman, Shivaram and Franklin, Michael J. and Ghodsi, Ali and Gonzalez, Joseph and Shenker, Scott and Stoica, Ion},
+ title = {Apache Spark: A Unified Engine for Big Data Processing},
+ journal = {Commun. ACM},
+ issue_date = {November 2016},
+ volume = {59},
+ number = {11},
+ month = oct,
+ year = {2016},
+ issn = {0001-0782},
+ pages = {56--65},
+ numpages = {10},
+ url = {http://doi.acm.org/10.1145/2934664},
+ doi = {10.1145/2934664},
+ acmid = {2934664},
+ publisher = {ACM},
+ address = {New York, NY, USA}
 }
 
-@misc{tpcds,
-  title = {TPC Benchmark DS (TPC-DS): The Benchmark Standard for decision support solutions including Big Data},
-  howpublished = "\url{http://www.tpc.org/tpcds/}"
+@online {spark-tera,
+    author = "Higgs, Ewan and Trivedi, Animesh and Zhang, Jeff",
+    year   = "2017",
+    title  = "Spark Terasort",
+    url    = "https://github.com/ehiggs/spark-terasort"
+}
+
+@online {tpcds,
+    author = "TPC",
+    year   = "2017",
+    title  = "TPC Benchmark DS (TPC-DS): The Benchmark Standard for decision support solutions including Big Data",
+    url    = "http://www.tpc.org/tpcds/"
 }
 
 @misc{sparktpcds,
@@ -49,9 +68,11 @@
   howpublished = "\url{http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html}"
 }
 
-@misc{hadooptutorial,
-  title = {Apache Hadoop Tutorial},
-  howpublished = "\url{http://hadoop.apache.org/docs/current/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html}"
+@online {hadooptutorial,
+    author = "Apache",
+    year   = "2017",
+    title  = "Apache Hadoop Tutorial",
+    url    = "http://hadoop.apache.org/docs/current/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html/"
 }
 
 @misc{sparksource,
@@ -59,14 +80,28 @@
   howpublished = "\url{https://github.com/apache/spark/tree/branch-1.6}"
 }
 
-@misc{sparkconf,
-  title = {Apache Spark 1.6.2 Configuration},
-  howpublished = "\url{http://spark.apache.org/docs/1.6.2/configuration.html}"
+@online {sparkconf,
+    author = "Apache",
+    year   = "2017",
+    title  = "Apache Spark 1.6.2 Configuration",
+    url    = "http://spark.apache.org/docs/1.6.2/configuration.html"
 }
 
-@misc{memcached,
-  title = {memcached: a distributed memory object caching system},
-  howpublished = "\url{http://www.memcached.org/}"
+@article{memcached,
+ author = {Fitzpatrick, Brad},
+ title = {Distributed Caching with Memcached},
+ journal = {Linux J.},
+ issue_date = {August 2004},
+ volume = {2004},
+ number = {124},
+ month = aug,
+ year = {2004},
+ issn = {1075-3583},
+ pages = {5--},
+ url = {http://dl.acm.org/citation.cfm?id=1012889.1012894},
+ acmid = {1012894},
+ publisher = {Belltown Media},
+ address = {Houston, TX},
 }
 
 @inproceedings{ishuffle,
@@ -360,3 +395,21 @@
  address = {New York, NY, USA},
  keywords = {Hadoop, MapReduce, cost-based optimization},
 } 
+
+@inproceedings{aalo,
+ author = {Chowdhury, Mosharaf and Stoica, Ion},
+ title = {Efficient Coflow Scheduling Without Prior Knowledge},
+ booktitle = {Proceedings of the 2015 ACM Conference on Special Interest Group on Data Communication},
+ series = {SIGCOMM '15},
+ year = {2015},
+ isbn = {978-1-4503-3542-3},
+ location = {London, United Kingdom},
+ pages = {393--406},
+ numpages = {14},
+ url = {http://doi.acm.org/10.1145/2785956.2787480},
+ doi = {10.1145/2785956.2787480},
+ acmid = {2787480},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {coflow, data-intensive applications, datacenter networks},
+}

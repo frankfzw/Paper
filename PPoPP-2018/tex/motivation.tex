@@ -54,7 +54,7 @@ Almost all reduce tasks start \textit{shuffle read} simultaneously. The synchron
 
 \subsubsection{Multi-round Tasks Execution}\label{multi}
 Both experience and DAG framework manuals recommend that multi-round execution of each stage will benefit the performance of applications.
-For example, Hadoop MapReduce Tutorial  \cite{hadooptutorial} suggests that \textit{10-100 maps} per-node and \textit{0.95 or 1.75 $\times$ no. of nodes $\times$ no. of maximum container} per-node seem to be the right level of parallelism. Spark Configuration also recommends $2-3$ tasks per CPU core in the cluster \cite{sparkconf}.
+For example, Hadoop MapReduce Tutorial \cite{hadooptutorial} suggests that \textit{10-100 maps} per-node and \textit{0.95 or 1.75 $\times$ no. of nodes $\times$ no. of maximum container} per-node seem to be the right level of parallelism. Spark Configuration also recommends $2-3$ tasks per CPU core in the cluster \cite{sparkconf}.
 Since the shuffle data become available as soon as the execution of one map task is finished. At the same time, the network is idle during the map stage (network utilization during map stage in Figure \ref{fig:util}). If the destination host of the shuffle output can be known in priori, the property of multi-round can be leveraged to overlap the \textit{shuffle read} operation.
 
 \subsubsection{Inefficient Persistent Storage Operation}
