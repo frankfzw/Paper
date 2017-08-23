@@ -36,8 +36,8 @@ for line in f:
     scache_map_exe.append(float(args[3]))
     scache_map_write.append(float(args[4]))
     spark_reduce_read.append(float(args[5]))
-    scache_reduce_read.append(float(args[6]))
-    spark_reduce_exe.append(float(args[7]))
+    spark_reduce_exe.append(float(args[6]))
+    scache_reduce_read.append(float(args[7]))
     scache_reduce_exe.append(float(args[8]))
 
 input_size = np.asarray(input_size)
