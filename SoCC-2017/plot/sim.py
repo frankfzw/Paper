@@ -16,9 +16,9 @@ def plot_sim(f):
         args = line.split()
         if len(args) == 0:
             continue
-        random.append(float(args[0]))
-        fifo.append(float(args[1]))
-        heap.append(float(args[2]))
+        random.append(float(args[1]))
+        fifo.append(float(args[2]))
+        heap.append(float(args[0]))
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
@@ -56,7 +56,7 @@ def plot_sim(f):
             label='Heuristic MinHeap')
     ax.plot(xs, ys, linewidth=3, color='r', ls='--')
     ax.legend(loc=4, fontsize=16, frameon=False)
-    ax.set_xticklabels(['1','','2','','3','','4','','5',''])
+    # ax.set_xticklabels(['1','','2','','3','','4','','5','','6','','7','','8','','9','','10',''])
     ax.set_ylabel('Avg. Improvement \%', fontsize=22)
     ax.set_xlabel('Round', fontsize=22)
     ax.set_aspect(0.6 / ax.get_data_ratio())
