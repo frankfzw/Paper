@@ -25,8 +25,8 @@ for line in f:
     if len(args) == 0:
         continue
     input_size.append(int(args[0]))
-    spark_reduce.append(float(args[2]))
-    scache_reduce.append(float(args[1]))
+    spark_reduce.append(float(args[1]))
+    scache_reduce.append(float(args[2]))
 
 input_size = np.asarray(input_size)
 xs = np.arange(len(input_size)) * 20
@@ -53,7 +53,7 @@ ax.barh(xs + width, spark_reduce, width,
 ax.set_yticks(xs + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Redcue Stage Completion Time (s)', fontsize=22)
+ax.set_xlabel('Reduce Stage Completion Time (s)', fontsize=22)
 ax.set_ylabel('Input Size (GB)', fontsize=22)
 ax.set_aspect(0.4 / ax.get_data_ratio())
 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
