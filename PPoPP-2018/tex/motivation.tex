@@ -11,19 +11,16 @@ In large scale data parallel computing, shuffle is designed to achieve an all-to
 % 	\caption{Shuffle Overview}
 % 	\label{fig:shuffle_process}
 % \end{figure}
-
-\begin{figure}
-	\includegraphics[width=\linewidth]{fig/util}
-	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
-	\label{fig:util}
-\end{figure}
-
 \textbf{Overview of shuffle process}. Each map task will partition the result data (key, value pair) into several buckets according to the partition function (e.g., hash). The total number of buckets equals the number of tasks in the next step.
 % shuffle data is produced by \textit{data partition}. For \textit{data partition}, 
 Shuffle can be further split into two parts: \textit{shuffle write} and \textit{shuffle read}. 
 The partitioned shuffle output data will be spilled to local persistent storage during shuffle write.
 Shuffle read starts at the beginning of reduce tasks. It fetches data that as input from both remote and local storage.
-
+\begin{figure}
+	\includegraphics[width=\linewidth]{fig/util}
+	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
+	\label{fig:util}
+\end{figure}
 %In short, shuffle is loosely coupled with application context and it's I/O intensive.
 
 \textbf{Impact of shuffle process}. Shuffle process is I/O intensive, which might introduce a significant latency to the application. Reports show that 60\% of MapReduce jobs at Yahoo!

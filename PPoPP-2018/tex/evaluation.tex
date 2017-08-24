@@ -21,7 +21,7 @@ We implement a Spark demon to enable shuffle optimization as a representative.
 We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \footnote{http://aws.amazon.com/ec2/}. Each node has 16GB memory and 4 CPUs. The network bandwidth is not specifically provided by Amazon. Our evaluations reveal the bandwidth is about 300 Mbps (see Figure \ref{fig:util}).
 \begin{figure*}
 	\centering
-	\begin{minipage}{.32\linewidth}
+	\begin{minipage}[t]{.32\linewidth}
 		\begin{subfigure}{\linewidth}
 			\begin{minipage}{\linewidth}
 				\includegraphics[width=\linewidth]{fig/groupbymapstage}
@@ -37,7 +37,7 @@ We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \footnote{h
 		\caption{Stage Completion Time of Single Shuffle Test}
 		\label{fig:singleshuffle}
 	\end{minipage}	
-	\begin{minipage}{.32\linewidth}
+	\begin{minipage}[t]{.32\linewidth}
 		\begin{subfigure}{\linewidth}
 			\begin{minipage}{\linewidth}
 				\includegraphics[width=\linewidth]{fig/groupbymaptask}
@@ -54,7 +54,7 @@ We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \footnote{h
 		\caption{Median Task Completion Time of Single Shuffle Test}
 		\label{fig:singleshuffletask}
 	\end{minipage}	
-	\begin{minipage}{.32\linewidth}
+	\begin{minipage}[t]{.32\linewidth}
 		\begin{subfigure}{\linewidth}
 			\begin{minipage}{\linewidth}
 				\includegraphics[width=\linewidth]{fig/tera}

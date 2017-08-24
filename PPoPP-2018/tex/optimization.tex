@@ -1,3 +1,10 @@
+\section{Shuffle Optimization}\label{opt}
+This section presents the detailed methodologies to achieve three design goals. The out-of-framework shuffle data management is used to decouple shuffle from execution and provide a cross-framework optimization. Two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}) are used to achieve shuffle data pre-fetching without launching tasks.
+
+\subsection{Decouple Shuffle from Execution}
+During map tasks, the partitioner takes a set of key-value pairs as input and calculates the partition number of a key-value pair by applying pre-defined the partition function to the key. After that, it stores the key-value pair in the corresponding data blocks. Each of the block contains the key-value pairs for one reduce partition. At the same time, blocks will be spilled to disk. To avoid blocking the slot by disk operation, we use memory copy to hijack shuffle data from map tasks. By doing this, a slot can be released as soon as it finishes CPU intensive computing. 
+On the reduce side, shuffle read is decoupled by pre-fetching shuffle data to local SCache client before reduce tasks start.
+
 \begin{figure}
 	\centering
 	\includegraphics[width=0.75\linewidth]{fig/sim}
@@ -11,14 +18,6 @@
 	\caption{Shuffle Time Fraction CDF of OpenCloud Trace}
 	\label{fig:cdf}
 \end{figure}
-
-\section{Shuffle Optimization}\label{opt}
-This section presents the detailed methodologies to achieve three design goals. The out-of-framework shuffle data management is used to decouple shuffle from execution and provide a cross-framework optimization. Two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}) are used to achieve shuffle data pre-fetching without launching tasks.
-
-\subsection{Decouple Shuffle from Execution}
-During map tasks, the partitioner takes a set of key-value pairs as input and calculates the partition number of a key-value pair by applying pre-defined the partition function to the key. After that, it stores the key-value pair in the corresponding data blocks. Each of the block contains the key-value pairs for one reduce partition. At the same time, blocks will be spilled to disk. To avoid blocking the slot by disk operation, we use memory copy to hijack shuffle data from map tasks. By doing this, a slot can be released as soon as it finishes CPU intensive computing. 
-On the reduce side, shuffle read is decoupled by pre-fetching shuffle data to local SCache client before reduce tasks start.
-
 %To this end, all I/O operations are managed outside of the DAG framework, and the slot is occupied only by the CPU intensive phases of task.
 
 \subsection{Pre-schedule with Application Context}

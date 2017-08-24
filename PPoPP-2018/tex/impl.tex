@@ -27,14 +27,15 @@ If the submitted shuffle dependencies contain a range partitioner or a customize
 	\includegraphics[width=0.8\linewidth]{fig/arch}
 	\caption{SCache Architecture}
 	\label{fig:arch}
+	\vspace{-1em}
 \end{figure}
 \begin{figure}
 	\centering
 	\includegraphics[width=0.6\linewidth]{fig/sample}
 	\caption{Reservoir Sampling of One Partition}
 	\label{fig:sample}
+	\vspace{-1em}
 \end{figure}
-
 \subsection{Memory Management}\label{memorymanage}
 As mentioned in Section \ref{observation}, though the shuffle size is relatively small, memory management should still be cautious enough to limit the effect of performance of DAG framework.
 When the size of cached blocks reaches the limitation of reserved memory, SCache flushes some of them to the disk temporarily, and re-fetches them when some cached shuffle blocks is consumed or pre-fetched. To achieve maximum overall improvement, SCache leverages two constraints to manage the in-memory data --- all-or-nothing and context-aware-priority.
