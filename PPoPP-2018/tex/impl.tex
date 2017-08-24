@@ -8,14 +8,14 @@ The coordination provides two guarantees: (a)data is stored in memory before tas
 The daemon bridges the communication between Spark and SCache. The co-scheduler is dedicated to pre-schedule reduce tasks with DAG information and enforce the scheduling results to Spark scheduler.
 
 When a Spark job starts, the DAG will be first generated. 
-During the DAG generation, the shuffle dependencies among RDDs will then be submitted through the daemon process in Spark driver. The SCache master recognize all shuffle dependencies in a RPC call as a shuffle scheduling unit.
+During the DAG generation, the shuffle dependencies among Resilient Distributed Datasets (RDDs) will then be submitted through the daemon process in Spark driver. The SCache master recognizes all shuffle dependencies in a RPC call as a shuffle scheduling unit.
 For each shuffle dependency, the shuffle ID, the type of partitioner, the number of map tasks, and the number of reduce tasks are included.  If there is a specialized partitioner, such as range partitioner, in the shuffle dependencies, the daemon will insert a sampling application before the dependent RDDs. We will elaborate the sampling procedure in the Section \ref{sampling}.
 
 For the hash partitioner, when a map task finishes computing, the SCache daemon process will transfer the map output data from Spark executor's JVM to the reserved memory through memory copy.
-After that the slot will be released without blocking on disk operation.
+After that the slot will be released without blocking on disk operations.
 When the shuffle map output is received, the SCache worker will notify the master of the block ID and reduce size distribution of this block (see map output in Figure \ref{fig:shuffle}).
 If the collected map output data reach the observation threshold, the DAG co-scheduler will run the scheduling Algorithm \ref{hminheap} and \ref{mhminheap} to pre-schedule the reduce tasks and then broadcast the scheduling result to start pre-fetching on each worker.
-More specifically, when a map task is finished, each node will receive a broadcast message. SCache worker will filter the reduce tasks ID that will be launched on itself and starts pre-fetching shuffle data from the remote. 
+More specifically, when a map task is finished, each node will receive a broadcast message. SCache worker will filter the reduce tasks ID that will be launched on itself and start pre-fetching shuffle data from the remote. 
 To enforce SCache pre-scheduled tasks -- node mapping, we insert some lines of codes in Spark DAG Scheduler.
 For RDDs with shuffle dependencies, Spark DAG scheduler will consult SCache master to get the preferred location for each partition and set \textit{NODE\_LOCAL} locality level on corresponding reduce tasks.
 
@@ -40,9 +40,9 @@ As mentioned in Section \ref{observation}, though the shuffle size is relatively
 When the size of cached blocks reaches the limitation of reserved memory, SCache flushes some of them to the disk temporarily, and re-fetches them when some cached shuffle blocks is consumed or pre-fetched. To achieve maximum overall improvement, SCache leverages two constraints to manage the in-memory data --- all-or-nothing and context-aware-priority.
 
 \subsubsection{All-or-Nothing Constraint}
-Memory cached shuffle blocks can speed up the reduce task execution process. But this acceleration of a single task is necessary but insufficient for a shorter stage completion time. Based on the observation in Section \ref{multi}, in most cases one single stage contains multi-rounds of tasks. If one task misses a memory cache and exceeds the original bottleneck of this round, that task might become the new bottleneck and further slow down the whole stage. PACMan \cite{pacman} has also proved that for multi-round stage/job, the completion time improves in steps when $n\times number\ of\ tasks\ in\ one\ round$ of tasks have data cached simultaneously. Therefore, the cache of shuffle blocks need to match the demand of all tasks in one running round at least. We refer to this as the all-or-nothing constraint.
+Memory cached shuffle blocks can speed up the reduce task execution process. But this acceleration of a single task is necessary but insufficient for a shorter stage completion time. Based on the observation in Section \ref{multi}, in most cases one single stage contains multi-rounds of tasks. If one task misses a memory cache and exceeds the original bottleneck of this round, that task might become the new bottleneck and further slow down the whole stage. PACMan \cite{pacman} has also proved that for multi-round stage/job, the completion time improves in steps when $n\times number\ of\ tasks\ in\ one\ round$ of tasks have data cached simultaneously. Therefore, the cached shuffle blocks need to match the demand of all tasks in one running round at least. We refer to this as the all-or-nothing constraint.
 
-According to all-or-nothing constraint, SCache master leverages the pre-scheduled results to determine the bound of each round, and set corresponding blocks as minimum unit of storage management.
+According to all-or-nothing constraint, SCache master leverages the pre-scheduled results to determine the bound of each round, and sets corresponding blocks as minimum unit of storage management.
 For those incomplete units, SCache will mark them as the lowest priority.
 % Following the all-or-noting constraint can maximum the improvement in stage completion time by using reserved memory efficiently.
 
@@ -50,7 +50,7 @@ For those incomplete units, SCache will mark them as the lowest priority.
 Unlike the traditional cache replacement schemes such as MIN \cite{min}, the cached shuffle data will only be used once (without failure) in DAG computing. That is, the effort of improving hit rate in most legacy schemes can not benefit DAG application, while their approaches can easily violate the all-or-nothing constraint.
 SCache also leverages application context to select victim storage units when the reserved memory is full.
 
-At first, SCache master searches for the incomplete units and flush all belonging blocks to disk cluster-widely.
+At first, SCache master searches for the incomplete units and flushes all belonging blocks to disk cluster-widely.
 
 If all the units are completed, SCache selects victims based on two factors --- \textit{inter-shuffle units} and \textit{intra-shuffle unit}.
 \begin{itemize}[noitemsep]
@@ -58,6 +58,11 @@ If all the units are completed, SCache selects victims based on two factors --- 
 	\item Intra-shuffle unit: SCache also needs to decide the priority among storage units inside a shuffle unit. According to the task scheduling inside a task set of Spark, the tasks with smaller ID will be scheduled firstly. Based on this, SCache can assign the lower priority to storage units with larger task ID.
 \end{itemize}
 
+\subsection{Cost of adapting DAG frameworks}
+SCache provides API through RPC, such as \textit{putBlock(blockId)}, \textit{getBlock(blockId)} and \textit{getScheduleResult(shuffleId)}. The concise design make it easy to adapt DAG frameworks to enable SCache optimization. For example, it only takes about 500 lines of code in Spark to integrate SCache. By a glance of Hadoop source code, we believe that the costs of enabling SCache on MapReduce \cite{hadoop} and YARN \cite{yarn} based DAG computing framework, such as Tez \cite{tez}, are also very low.
+
+\subsection{Fault tolerance}
+Since fault tolerance is not a crucial goal of SCache, we have not implemented fault tolerance mechanism. We plan to implement SCache master with Apache ZooKeeper \cite{zookeeper} to provide constantly service.  For SCache worker, a promising way to prevent failure is to select some backup nodes to store replications of shuffle data during pre-scheduling. In addition, there are also advanced fast recovery techniques such as FineFRC \cite{finefrc}. We leave this to the future work.
 
 
 

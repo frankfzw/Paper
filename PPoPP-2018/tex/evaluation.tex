@@ -4,7 +4,7 @@
 	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application With SCache}
 	\label{fig:scache_util}
 \end{figure}
-In this section, we present the evaluation of SCache with comprehensive workloads and benchmarks. First we run a simple DAG job with single shuffle to analysis hardware utilization and impact of shuffle optimization from the scope of a task to a job. 
+This section reveals the evaluation of SCache with comprehensive workloads and benchmarks. First we run a simple DAG job with single shuffle to analysis hardware utilization and impact of shuffle optimization from the scope of a task to a job. 
 Then we use a recognized shuffle intensive benchmark --- Terasort \cite{spark-tera} to evaluate SCache with different data partition schemes.
 In order to prove the performance gain of SCache with a real production workload, we also evaluate Spark TPC-DS \footnote{https://github.com/databricks/spark-sql-perf} and present the overall performance improvement.
 At last, we measure the overhead of weighted reservoir sampling. 
@@ -21,7 +21,7 @@ We implement a Spark demon to enable shuffle optimization as a representative.
 We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \footnote{http://aws.amazon.com/ec2/}. Each node has 16GB memory and 4 CPUs. The network bandwidth is not specifically provided by Amazon. Our evaluations reveal the bandwidth is about 300 Mbps (see Figure \ref{fig:util}).
 \begin{figure*}
 	\centering
-	\begin{minipage}[b]{.32\linewidth}
+	\begin{minipage}{.32\linewidth}
 		\begin{subfigure}{\linewidth}
 			\begin{minipage}{\linewidth}
 				\includegraphics[width=\linewidth]{fig/groupbymapstage}
@@ -37,7 +37,7 @@ We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \footnote{h
 		\caption{Stage Completion Time of Single Shuffle Test}
 		\label{fig:singleshuffle}
 	\end{minipage}	
-	\begin{minipage}[b]{.32\linewidth}
+	\begin{minipage}{.32\linewidth}
 		\begin{subfigure}{\linewidth}
 			\begin{minipage}{\linewidth}
 				\includegraphics[width=\linewidth]{fig/groupbymaptask}
@@ -54,17 +54,17 @@ We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \footnote{h
 		\caption{Median Task Completion Time of Single Shuffle Test}
 		\label{fig:singleshuffletask}
 	\end{minipage}	
-	\begin{minipage}[b]{.32\linewidth}
+	\begin{minipage}{.32\linewidth}
 		\begin{subfigure}{\linewidth}
 			\begin{minipage}{\linewidth}
 				\includegraphics[width=\linewidth]{fig/tera}
-				\caption{Reduce Stage Completion Time of First Shuffle}
+				\caption{Reduce Stage of First Shuffle}
 				\label{fig:terasort}
 			\end{minipage}
 
 			\begin{minipage}{\linewidth}
 				\includegraphics[width=\linewidth]{fig/tera_shuffle}
-				\caption{Shuffle Through Network of Second Shuffle}
+				\caption{Network Traffic of Second Shuffle}
 				\label{fig:terashuffle}
 			\end{minipage}
 		\end{subfigure}
@@ -74,7 +74,7 @@ We run our experiments on a 50 m4.xlarge nodes cluster on Amazon EC2 \footnote{h
 
 \subsection{Simple DAG Analysis}
 %\subsubsection{Hardware Utilization}
-We first run the same single shuffle test as mentioned in Figure \ref{fig:util}. As shown in Figure \ref{fig:scache_util}, the hardware utilization is captured from one node during the job. Note that since the completion time of whole job is about $50\%$ less than Spark without SCache, the duration of Figure \ref{fig:scache_util} is cut in half as well. An overlap between CPU, disk and network can be easily observed in Figure \ref{fig:scache_util}. That is, SCache prevent the computing process from being cutting off by the I/O operations with a fine-grained resource allocation. It ensures the overall CPU utilization of the cluster stays in a high level. In addition, the decoupling of shuffle write helps free the CPU earlier and leads to a faster map task computation. At the same time, the shuffle pre-fetching in the early stage of map phase shift the network transfer completion time, which decrease reduce stage completion time. The combination is the main performance gain we achieved on the scope of hardware utilization by SCache.
+We first run the same single shuffle test as mentioned in Figure \ref{fig:util}. As shown in Figure \ref{fig:scache_util}, the hardware utilization is captured from one node during the job. Note that since the completion time of whole job is about $50\%$ less than Spark without SCache, the duration of Figure \ref{fig:scache_util} is cut in half as well. An overlap between CPU, disk and network can be easily observed in Figure \ref{fig:scache_util}. That is, SCache prevents the computing process from being cutting off by the I/O operations with a fine-grained resource allocation. It ensures the overall CPU utilization of the cluster stays in a high level. In addition, the decoupling of shuffle write helps free the CPU earlier and leads to a faster map task computation. At the same time, the shuffle pre-fetching in the early stage of map phase shifts the network transfer completion time, which decreases reduce stage completion time. The combination is the main performance gain we achieved on the scope of hardware utilization by SCache.
 % \begin{figure}
 % 	%\vspace*{-0.01cm}
 % 	\begin{subfigure}{\linewidth}
@@ -116,7 +116,7 @@ On the other hand, the network transfer introduces a significantly latency in sh
 
 \subsection{Terasort}
 We also evaluate Terasort \cite{spark-tera} --- a recognized shuffle intensive benchmark for distributed system analysis.
-Terasort consists of two consecutive shuffles. The first shuffle reads the input data and uses a customized hash partition function for re-partitioning. The second shuffle partitions the data through a range partitioner. As the range bounds set by range partitioner almost match the same pattern of the first shuffle, almost $93\%$ of input data is from one particular map task for each reduce task. So we take the second shuffle as an extreme case to evaluate the scheduling locality for SCache.
+Terasort consists of two consecutive shuffles. The first shuffle reads the input data and uses a customized hash partition function for re-partitioning. The second shuffle partitions the data through a range partitioner. As the range bounds set by range partitioner almost matches the same pattern of the first shuffle, almost $93\%$ of input data is from one particular map task for each reduce task. So we take the second shuffle as an extreme case to evaluate the scheduling locality for SCache.
 
 As shown in Figure \ref{fig:terasort}, we present the first shuffle as the evaluation of shuffle optimization. At the same time, we use the second the shuffle to evaluate in the dimension of scheduling locality (Figure \ref{fig:terashuffle}). For the first shuffle, Spark with SCache runs 2 $\times$ faster during the reduce stage with the input data in a range from 10GB to 200GB. At the same time, Figure \ref{fig:terashuffle} reveals that SCache pre-scheduling produces exactly same network traffic of second shuffle as Spark, which implies that SCache pre-scheduling can obtain the best locality while balancing the load. In contrast, Spark delays scheduling reduce tasks with the shuffle map output to achieve this optimum.
 
@@ -139,4 +139,10 @@ We also evaluate some shuffle heavy queries from TPC-DS \cite{tpcds}. TPC-DS ben
 % 	\caption{Terasort Evaluation}
 % \end{figure}
 \subsection{Overhead of Sampling}
-In this part, we evaluate the overhead of sampling with different input data sizes on one node and cluster scales. In \ref{fig:sampling}, the overhead of sampling only grows with the increase of input size on each node. But it remains relatively stable when the cluster size scales up. It makes SCache a scalable system in cluster.
+In this part, we evaluate the overhead of sampling with different input data sizes on one node and cluster scales. In Figure \ref{fig:sampling}, the overhead of sampling only grows with the increase of input size on each node. But it remains relatively stable when the cluster size scales up. It makes SCache a scalable system in cluster.
+\begin{figure}
+	\centering
+	\includegraphics[width=0.6\linewidth]{fig/sampling}
+	\caption{Sampling Overhead}
+	\label{fig:sampling}
+\end{figure}
