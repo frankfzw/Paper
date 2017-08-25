@@ -2,8 +2,8 @@
 This section presents the detailed methodologies to achieve three design goals. The out-of-framework shuffle data management is used to decouple shuffle from execution and provide a cross-framework optimization. Two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}) are used to achieve shuffle data pre-fetching without launching tasks.
 
 \subsection{Decouple Shuffle from Execution}
-During map tasks, the partitioner takes a set of key-value pairs as input and calculates the partition number of a key-value pair by applying pre-defined the partition function to the key. After that, it stores the key-value pair in the corresponding data blocks. Each of the block contains the key-value pairs for one reduce partition. At the same time, blocks will be spilled to disk. To avoid blocking the slot by disk operation, we use memory copy to hijack shuffle data from map tasks. By doing this, a slot can be released as soon as it finishes CPU intensive computing. 
-On the reduce side, shuffle read is decoupled by pre-fetching shuffle data to local SCache client before reduce tasks start.
+During map tasks, the partitioner takes a set of key-value pairs as input and calculates the partition number for each of them by applying pre-defined the partition function. After that, it stores all key-value pairs in the corresponding data blocks. Each of the block contains the key-value pairs for one reduce partition. At the same time, blocks will be spilled to disk. In order to avoid blocking the slot by disk operation, we use memory copy to hijack shuffle data from map tasks. By doing this, a slot can be released as soon as a task finishes CPU intensive computing. 
+From the perspective of reduce task, shuffle read is decoupled by pre-fetching shuffle data to local SCache client before reduce tasks start.
 
 \begin{figure}
 	\centering
@@ -21,7 +21,7 @@ On the reduce side, shuffle read is decoupled by pre-fetching shuffle data to lo
 %To this end, all I/O operations are managed outside of the DAG framework, and the slot is occupied only by the CPU intensive phases of task.
 \subsection{Pre-schedule with Application Context}
 The pre-scheduling and pre-fetching start when the collected shuffle data exceeds the threshold.
-This is the main challenge toward the optimization. The task --- node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. But as soon as tasks are scheduled, slots will be occupied to launch them. On the other hand, the shuffle data cannot be pre-fetched without knowing the task --- node mapping.
+This is the most critic step toward the optimization. The task --- node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. Once the tasks are scheduled, the slots will be occupied to launch them. On the other hand, the shuffle data cannot be pre-fetched without the readiness of task --- node mapping.
 To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}). That is, the task --- node mapping is established ahead of DAG framework scheduler, and it is enforced to DAG scheduler before the real scheduling.
 
 \begin{figure}
@@ -60,7 +60,7 @@ To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic
 % \begin{figure}
 \subsubsection{Problem of Random Mapping}\label{randomassign}
 The simplest way of pre-scheduling is mapping tasks to different nodes randomly. It only guarantees that each node run same number of tasks. 
-As shown in Figure \ref{fig:sim}, we use traces from OpenCloud \footnote{\label{fn:trace}http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html} for the simulation to evaluate the impact of different pre-scheduling algorithms. The baseline (red dot line in Figure \ref{fig:sim}) is the stage completion time with Spark default scheduling algorithm. And then we remove the shuffle read time of each task, and do the simulation under three different schemes: random mapping, Spark FIFO, and our heuristic MinHeap.
+As shown in Figure \ref{fig:sim}, we use traces from OpenCloud \footnote{\label{fn:trace}http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html} for the simulation to evaluate the impact of different pre-scheduling algorithms. The baseline (red dot line in Figure \ref{fig:sim}) is the stage completion time with Spark default scheduling algorithm. And then we remove the shuffle read time of each task, and run the simulation under three different schemes: random mapping, Spark FIFO, and our heuristic MinHeap.
 Note that most of the traces from OpenCloud is shuffle-light workload as shown in Figure \ref{fig:cdf}. The average shuffle read time is 3.2\% of total reduce completion time.
 
 Random mapping works well when there is only one round of tasks. But the performance collapses as the round number grows. It is because that data skew commonly exists in data-parallel computing \cite{skewtune, reining, gufler2012load}. Several heavy tasks might be assigned on the same node. This collision then slows down the whole stage and makes the performance even worse than the baseline. In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which might introduces extra network traffic in cluster.

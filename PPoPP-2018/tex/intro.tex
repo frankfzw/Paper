@@ -64,8 +64,7 @@ Specifically, SCache takes over the whole shuffle phase from the underlying fram
 SCache's effectiveness lies in the following two key ideas.
 First, SCache decouples the shuffle read and write from both map and reduce tasks.
 Such decoupling effectively enables fine-grained resource management and better multiplexing between the computational and I/O resources.
-Second,
-SCache pre-schedules the reduce tasks and pre-fetches the shuffle data to the location of the reduce tasks without launching them.
+In addition, SCache pre-schedules the reduce tasks and pre-fetches the shuffle data to the location of the reduce tasks without launching them.
 Such pre-scheduling and pre-fetching effectively desynchronize the network I/O operation, while avoiding the waste of computational resources compared to the early start mechanism.
 %In this paper, we introduce S(huffle)Cache, an plugin system to remove shuffle latency for DAG frameworks. SCache takes over the management of shuffle and I/O resources to acheive a fine granularity scheduling of tasks. In addition, SCache pre-schedules the reduce tasks without launching them and perform shuffle data pre-fetch to break the synchronization of shuffle fetch. In order to provide a general optimization for different DAG frameworks, SCache decouple the shuffle process from computing and  provide a cross-frameworks API for shuffle write and read.
 
