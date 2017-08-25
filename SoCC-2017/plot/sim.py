@@ -16,9 +16,9 @@ def plot_sim(f):
         args = line.split()
         if len(args) == 0:
             continue
-        random.append(float(args[1]))
-        fifo.append(float(args[2]))
-        heap.append(float(args[0]))
+        random.append(float(args[0]))
+        fifo.append(float(args[1]))
+        heap.append(float(args[2]))
         
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
