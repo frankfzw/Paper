@@ -17,6 +17,7 @@ However, since each phase receives a fixed bundle of resources, attaching the \e
 	\caption{Workflow Comparison between Legacy DAG Computing Frameworks and Frameworks with SCache}
 	\label{fig:workflow}
 \end{figure}
+
 Moreover, the shuffle read phase introduces all-to-all communication pattern across the network, and such network I/O procedure is also poorly coordinated.
 Note that the shuffle read phase starts fetching data only after all the data from its ancestor stage by default. As a result, all the corresponding reduce tasks start fetching shuffle data almost simultaneously.
 Such synchronized network communication causes a burst demand for network I/O, which in turn greatly enlarges the shuffle read completion time. To desynchronize the network communication, an intuitive way is to launch some tasks in the descendent stage earlier such as \textit{early start} from Apache Hadoop \cite{hadoop}. However, such early start is by no means a panacea. This is because although the reduce tasks can start fetching data early, the computation can only take place after all the data is ready. Since each phase receives a fixed bundle of resources, starting a reduce task early always introduces an unnecessary early allocation of slot.

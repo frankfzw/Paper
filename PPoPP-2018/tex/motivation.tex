@@ -17,6 +17,7 @@ In large scale data parallel computing, shuffle is designed to achieve an all-to
 Shuffle can be further split into two parts: \textit{shuffle write} and \textit{shuffle read}. 
 The partitioned shuffle output data will be spilled to local persistent storage during shuffle write.
 Shuffle read starts at the beginning of reduce tasks. It fetches data that as input from both remote and local storage.
+
 \begin{figure}
 	\includegraphics[width=\linewidth]{fig/util}
 	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
