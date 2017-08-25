@@ -45,6 +45,7 @@ Figure \ref{fig:util} reveals the performance information of two stages that are
 \begin{figure}
 	\includegraphics[width=\linewidth]{fig/util}
 	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
+	\vspace{-1em}
 	\label{fig:util}
 \end{figure}
 
@@ -69,4 +70,4 @@ Based on these observations, it is straightforward to come up with an optimizati
 	\item Reduce tasks should be pre-scheduled without launching to achieve shuffle data pre-fetch.
 	\item Shuffle process should be taken over and managed outside DAG frameworks to provide a cross-framework optimization
 \end{itemize}
-In the following section, we elaborate the methodologies to achieve three design goals.
+%In the following section, we elaborate the methodologies to achieve three design goals.
