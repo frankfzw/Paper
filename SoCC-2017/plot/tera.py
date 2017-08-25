@@ -45,11 +45,11 @@ width = 8
 
 ax.barh(xs, scache_reduce, width, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="/////",
+        edgecolor=orage, hatch="///",
         label='Spark With SCache')
 ax.barh(xs + width, spark_reduce, width, 
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="+++++", label='Spark')
+        edgecolor=blue, hatch="+++", label='Spark')
 ax.set_yticks(xs + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)
@@ -86,11 +86,11 @@ width = 8
 
 ax.barh(xs, scache_shuffle, width, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="/////",
+        edgecolor=orage, hatch="///",
         label='Spark With SCache')
 ax.barh(xs + width, spark_shuffle, width, 
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="+++++", label='Spark')
+        edgecolor=blue, hatch="+++", label='Spark')
 ax.set_yticks(xs + width)
 ax.set_yticklabels(input_size)
 # ax.legend(loc=4, fontsize=16, frameon=False)

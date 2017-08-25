@@ -61,21 +61,21 @@ width = 8
 
 ax.barh(input_size, scache_map_exe, width, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="/////",
+        edgecolor=orage, hatch="///",
         label='SCache Computing')
 ax.barh(input_size, scache_map_write, width,
         left=scache_map_exe, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="-----",
+        edgecolor=orage, hatch="---",
         label='SCache Shuffle Write')
 ax.barh(input_size + width, spark_map_exe, width, 
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="+++++", 
+        edgecolor=blue, hatch="+++", 
         label='Spark Computing')
 ax.barh(input_size + width, spark_map_write, width, 
         left=spark_map_exe,
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="xxxxx", 
+        edgecolor=blue, hatch="xxx", 
         label='Spark Shuffle Write')
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
@@ -96,21 +96,21 @@ plt.savefig("groupbymaptask.pdf")
 fig, ax = plt.subplots()
 ax.barh(input_size, scache_reduce_read, width, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="/////",
+        edgecolor=orage, hatch="///",
         label='SCache Shuffle Read')
 ax.barh(input_size, scache_reduce_exe, width,
         left=scache_reduce_read, 
         linewidth=2, color='none', 
-        edgecolor=orage, hatch="-----",
+        edgecolor=orage, hatch="---",
         label='SCache Computing')
 ax.barh(input_size + width, spark_reduce_read, width, 
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="+++++", 
+        edgecolor=blue, hatch="+++", 
         label='Spark Shuffle Read')
 ax.barh(input_size + width, spark_reduce_exe, width, 
         left=spark_reduce_read,
         linewidth=2, color='none', 
-        edgecolor=blue, hatch="xxxxx", 
+        edgecolor=blue, hatch="xxx", 
         label='Spark Computing')
 ax.set_yticks(input_size + width)
 ax.set_yticklabels(input_size)
