@@ -10,22 +10,24 @@ We choose Spark as the representative of DAG computing framework to implement ou
 \end{figure}
 
 \subsection{Decouple Shuffle from Execution}
-On the map side, map tasks partition the output data according to the pre-defined partitioner. More specifically, partitioner takes a set of key-value pairs as input. And then it calculates the partition number of a key-value pair by applying pre-defined the partition function to the key. After that it puts the key-value pair into the corresponding data blocks. Each of them contains the key-value pairs for one partition. At last, they will be flushed to disk. The decoupling starts right here. To prevent from the synchronized disk write holding the slot, we use memory copy to hijack shuffle data from Spark executor's JVM space. By doing this, a slot can be released as soon as it finishes CPU intensive computing. After that, shuffle data is managed outside the DAG framework. The pre-scheduling can be performed to start pre-fetch after enough shuffle data is collected.
+On the map side, map tasks partition the output data according to the pre-defined partitioner. More specifically, partitioner takes a set of key-value pairs as input. And then it calculates the partition number of a key-value pair by applying pre-defined the partition function to the key. After that it puts the key-value pair into the corresponding data blocks. Each of the block contains the key-value pairs for one partition. Meanwhile, the blocks will be spilled to disk. The decoupling starts right here. To prevent from the synchronized disk write holding the slot, we use memory copy to hijack shuffle data from Spark executor's JVM space. By doing this, a slot can be released as soon as a task finishes CPU intensive computing. After that, shuffle data is managed outside the DAG framework. The pre-scheduling can be performed to start pre-fetch after enough shuffle data is collected.
 
 On the reduce side, shuffle read is decoupled by pre-fetching shuffle data to local memory after pre-scheduling before reduce tasks start.
 
-To this end, all I/O operations are managed outside of the DAG framework, and the slot is occupied only by the CPU intensive phase of task.
+To this end, all I/O operations are managed outside the DAG framework, and a slot is occupied only by the CPU intensive phase of a task.
+
 \begin{figure}
 	\centering
 	\includegraphics[width=0.75\linewidth]{fig/reduce_cdf}
 	\caption{Shuffle Time Fraction CDF of OpenCloud Trace}
 	\label{fig:cdf}
 \end{figure}
-\subsection{Pre-schedule with Application Context}
-The main challenge toward the optimization is how to pre-schedule the reduce tasks without launching. The task --- node mapping is decided until tasks are scheduled by scheduler of DAG framework. But as soon as they are scheduled, slots will be occupied to launch them. On the other hand, shuffle data cannot be pre-fetched without knowing the node and tasks mapping.
-To get rid of this dilemma, we propose a co-scheduling scheme. That is, the task --- node mapping is established ahead of DAG framework scheduler, and then enforce the mapping result to DAG scheduler while doing the real scheduling.
 
-To evaluate the impact of different pre-scheduling schemes, we use trace from OpenCloud \cite{opencloudtrace} for the simulation. The baseline (red dot line in Figure \ref{fig:sim}) is the stage completion time under Spark default scheduling algorithm. And then we remove the shuffle read time of each task, and do the simulation under three different schemes: random mapping, Spark FIFO, and our heuristic MinHeap.
+\subsection{Pre-schedule with Application Context}
+The main challenge toward the optimization is how to pre-schedule the reduce tasks without launching. The task --- node mapping is decided until tasks are scheduled by scheduler of the DAG framework. But as soon as they are scheduled, slots will be occupied to launch them. On the other hand, shuffle data cannot be pre-fetched without knowing the task --- node mapping.
+To get rid of this dilemma, we propose a co-scheduling scheme. That is, the task --- node mapping is established ahead of the DAG framework scheduler, and then is enforced to the DAG scheduler while doing the real scheduling.
+
+To evaluate the impact of different pre-scheduling schemes, we use trace from OpenCloud \cite{opencloudtrace} for the simulation. The baseline (red dot line in Figure \ref{fig:sim}) is the stage completion time under Spark default scheduling algorithm. And then we remove the shuffle read time of each task, and do the simulation under three different schemes: random mapping, Spark FIFO, and our heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}).
 
 % We explore several pre-scheduling schemes in different scenarios, and evaluate the performance calculating the improvement of reduce tasks completion time with trace of OpenCloud \cite{opencloudtrace}. We first emulate the scheduling algorithm of Spark to schedule the reduce tasks of one job, and take the bottleneck of the task set as the completion time. Then we remove the shuffle read time as the assumption of shuffle data pre-fetch and emulate under different schemes. The result is shown in \ref{fig:sim}.
 % \begin{figure*}
@@ -57,7 +59,7 @@ To evaluate the impact of different pre-scheduling schemes, we use trace from Op
 
 
 
-Note that most of the traces from OpenCloud is shuffle-light workload as shown in Figure \ref{fig:cdf}. The average shuffle read time is 2.3\% of total reduce completion time.
+Note that most of the traces from OpenCloud is shuffle-light workload as shown in Figure \ref{fig:cdf}. The average shuffle read time is 3.2\% of total reduce completion time.
 
 \subsubsection{Failure of Random Mapping}\label{randomassign}
 The simplest way of pre-scheduling is mapping tasks to different nodes evenly.  As shown in Figure \ref{fig:sim}, Random mapping works well when there is only one round of tasks. But the performance collapses as the round number grows. It is because that data skew commonly exists in data-parallel computing \cite{skewtune, reining, gufler2012load}. Several heavy tasks might be assigned on the same node. This collision then slows down the whole stage, which makes the performance even worse than the baseline. In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which might introduce extra network traffic in cluster.
