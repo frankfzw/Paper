@@ -6,7 +6,7 @@
 % 双面打印
 % \documentclass[doctor, fontset=adobe, openright, twoside]{sjtuthesis}
 % \documentclass[bachelor, fontset=adobe, openany, oneside, submit]{sjtuthesis}
-\documentclass[master, fontset=adobe, twoside, openright, review]{sjtuthesis}
+\documentclass[master, fontset=adobe, twoside, openright, submit]{sjtuthesis}
 % \documentclass[%
 %   bachelor|master|doctor,	% 必选项
 %   fontset=adobe|windows,  	% 只测试了adobe
@@ -61,16 +61,17 @@
 \listofalgorithms
 \addcontentsline{toc}{chapter}{算法索引}        %将算法目录加入全文目录
 
-\include{tex/symbol} % 主要符号、缩略词对照表
+% \include{tex/symbol} % 主要符号、缩略词对照表
 
 \mainmatter	% 使用阿拉伯数字对正文编号
 
 %% 正文内容
 \pagestyle{main}
 \include{tex/intro}
-\include{tex/example}
-\include{tex/faq}
-\include{tex/summary}
+\include{tex/observations}
+% \include{tex/example}
+% \include{tex/faq}
+% \include{tex/summary}
 
 \appendix	% 使用英文字母对附录编号，重新定义附录中的公式、图图表编号样式
 \renewcommand\theequation{\Alph{chapter}--\arabic{equation}}	
