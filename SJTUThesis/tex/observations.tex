@@ -3,7 +3,7 @@
 %% chapter02.tex for SJTU Master Thesis
 %%==================================================
 
-\chapter{shuffle特点观察}
+\chapter{Shuffle特点观察}
 \label{chap:observations}
 
 本章首先分析了shuffle在目前分布式DAG计算框架中的特性，然后通过对其特征的研究，结合DAG计算过框架的特性，探索其优化的方向。
@@ -51,6 +51,13 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 
 从单节点的硬件资源率用率和任务执行的时间分布，结合多个节点的这部分数据，我们发现以下一些问题。
 
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=\textwidth]{../../PPoPP-2018/fig/util.pdf}
+	\bicaption[fig:util]{运行包含一个shuffle的Spark应用时的硬件资源利用率}{运行包含一个shuffle的Spark应用时的硬件资源利用率}{Fig}{CPU utilization and I/O throughput of a node
+	during a Spark single shuffle application}
+\end{figure}
+
 \subsection{粗粒度的资源分配}
 
 在现有的硬件资源分配机制下，当一个slot被计算框架分配给一个任务的时候，只有在该任务执行结束，这个slot以及其对应的硬件资源才会被释放。
@@ -83,23 +90,44 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 对于必要性，在当下数据中心内存日益增大的背景下，为了节约内存而采用的将shuffle数据写入磁盘的方式（spill）并没有那么强的必要性。
 而且相较于应用的输入数据而言，shuffle数据作为中间结果，其体积要相对小很多。
 比如Spark Terasort\cite{spark-tera}中，shuffle数据只占到了输入数据的25\%不到。
-在一些研究中\cite{makingsense}的数据也表明，shuffle数据大约只占到了输入数据的10\% \sim 20\%。
+在一些研究中\cite{makingsense}的数据也表明，shuffle数据大约只占到了输入数据的10\% $\sim$ 20\%。
 从另一个角度来看，目前出现了越来越多的基于内存的分布式存储系统，比如memcached\cite{memcached}，Tachyon\cite{tachyon}（现在的Alluxio\cite{alluxio}）以及RAMCloud\cite{ramcloud}等。
 这个趋势间接表面了在目前的数据中心环境下，内存资源是足够用来存放这些数据的。
 同时，由于DAG的存在，结合调度算法可以很容易就获取任务的调度顺序。
 在这个前提下，即使内存资源十分紧张，shuffle的数据也可以通过异步预取的方式，提前从磁盘获取。
 因此我们任务，目前在shuffle过程中低效率的磁盘操作是可以被优化的。
 
-\begin{figure}[!htp]
-	\centering
-	\includegraphics[width=\textwidth]{../../PPoPP-2018/fig/util.pdf}
-	\bicaption[fig:util]{一个节点在运行包含一个shuffle的Spark应用时的硬件资源利用率}{一个节点在运行包含一个shuffle的Spark应用时的硬件资源利用率}{Fig}{CPU utilization and I/O throughput of a node
-	during a Spark single shuffle application}
-\end{figure}
+\subsection{多轮任务执行}
 
+在运行分布式DAG计算工作的时候，对于每一阶段的计算任务，无论是经验还是这些框架的手册都推荐在开发应用时将每个计算阶段并行的任务划分成多轮。
+即对于一个有$s$个计算slot的计算集群而言，每个计算阶段的并行任务$t$：
+\begin{equation}
+	\label{eq:multi}
+	t = k \times x \quad (k = 1, 2, 3, ...)
+\end{equation}
+比如Hadoop MapReduce的手册\cite{hadooptutorial}建议每个节点运行10-100个map任务（即等式\ref{eq:multi}中 $k \in [10, 100]$）。
+同时该手册还建议运行时任务时将任务的并发度调整到$0.95$ 或 $1.75 \times$ 节点数 $\times$ 每个节点的最大容器数。
+Spark的配置手册\cite{sparkconf}也建议为节点上的每个CPU分配2-3个任务（即等式\ref{eq:multi}中 $k = 2, 3$）。
+
+对于shuffle数据而言，当每一个map任务运行结束时，该任务所产生的shuffle数据就能被完整的获取。
+于此同时，结合图\ref{fig:util}，可以观察到在任务执行过程中，网络一直处于闲置状态。
+因此在多轮任务执行的应用环境当中，如果shuffle传输的目的节点已知，那么shuffle数据便可以在map阶段的执行过程中进行预取。
+这种多轮任务的属性则可以很好的将shuffle数据传输过程进行重叠。
+
+\subsection{本章小结}
+通过以上的观察和分析，我们认为shuffle存在继续优化的空间。
+具体来讲，就是通过解耦合的方式移除阻塞式的I/O操作，然后利用多轮任务执行的特性对shuffle数据进行预取，同时通过内存数据缓存来进一步加速shuffle的读写。
+基于上述优化目标，我们提出了SCache针对分布式DAG计算框架shuffle过程的优化系统。
 在图\ref{fig:workflow}的下半部分展现了DAG计算框架与SCache协同工作时的工作流程。
 在shuffle write阶段，SCache通过内存拷贝的方式讲数据直接从任务的内存空间拷贝到预留的shuffle数据存储内存区域。
 于此同时，磁盘的写操作将被省略。而由框架分配的slot资源也会在内存拷贝结束之后被立即释放。
 这些缓存在内存中的shuffle数据会在SCache完成对reduce任务的预调度之后立刻进行网络传输。
 这种预传输方式既能将shuffle read阶段的时间很好的隐藏在map任务执行的过程中，又能避免传统DAG计算框架统一调度带来的同步瞬时大量的网络吞吐。
 
+为了实现以上优化：
+\begin{itemize}
+	\item Shuffle的过程必须从计算任务中解耦，从而实现更细粒度的资源分配和更高的资源利用率。
+	\item Reduce任务必须在map阶段就进行预调度，从而实现shuffle数据预取。同时在预调度的过程中不能真正启动reduce任务，以防其占用计算资源。
+	\item 需要结合DAG计算逻辑实现精细化shuffle数据内存缓存管理，进一步加快shuffle读写速度。
+	\item 为了实现跨框架的优化方案，shuffle过程必须被独立到计算框架外部进行管理，并且实现一个具有通用性的API。
+\end{itemize}
