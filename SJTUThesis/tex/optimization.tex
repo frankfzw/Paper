@@ -4,7 +4,7 @@
 %%==================================================
 
 \chapter{Shuffle的优化策略}
-\label{optimization}
+\label{chap:optimization}
 
 本章将详细阐述实现shuffle优化的方法论。
 首先SCache通过提供shuffle读写API的方式来实现shuffle在计算任务中的解耦。
@@ -78,17 +78,19 @@
 
 虽然这是一个轻量shuffle的工作日志，但是在模拟中我们发现随机调度算法仅仅只能在只有一轮计算任务的情况下获得一个较好的性能提升。
 随着任务执行轮次的增加，随机调度算法的性能甚至不如没有经过shuffle预取优化的基准线。
-究其原因，是由于在分布式DAG计算过程当中，普遍存在数据分区之后体积的分布不均，存在倾斜（data skew）\cite{reining, gufler2012load, skewtune}。
+究其原因，是由于在分布式DAG计算过程当中，普遍存在数据分区之后体积的分布不均，即数据倾斜（data skew）\cite{reining, gufler2012load, skewtune}。
 在随机调度算法中，可能会把几个输入数据相对较大的任务调度到一个节点上。
 因为受限于BSP的同步模式，一个计算阶段的完成需要等到该阶段所有任务的完成。
 这种缓慢任务的碰撞会拖慢整个计算阶段的完成，进而使得性能甚至不如没有优化的基准线。
 更重要的是，随机调度完全忽略了shuffle数据的本地性，因而可能在shuffle网络传输阶段引入额外的流量开销。
 
-\subsection{对shuffle数据分布的预测}
+\subsection{预测shuffle数据分布}
 
-随机任务预调度之所以会造成这些问题是因为在调度过程中完全忽略了应用的上下文信息，比如map阶段产生的shuffle数据的体积分布等。
+随机任务预调度之所以会造成这些问题是因为其算法只考虑了在任务数上的均匀分配，而没有考虑每个任务本身的负载，也就是其计算所需要的输入数据体积。
+同时，随机任务调度在调度过程中完全忽略了应用的上下文信息，比如map阶段产生的shuffle数据的体积分布等。
 而一个较优的调度结果可以在该reduce计算阶段总共依赖的shuffle数目，该reduce阶段的任务数目（即shuffle数据块个数）以及每个shuffle中数据块体积这些参数都已知的情况下做出。
-在这些都已知的情况下，如果不考虑数据本地性，则该调度问题可以被转化为经典的makespan问题，通过近似算法可以获得至少2倍于最优值的调度结果\cite{approximation}。
+在这些都已知的情况下，对于每个reduce任务计算所需要的输入数据体积就能够被计算出来。
+如果不考虑数据本地性，则该调度问题可以被转化为经典的makespan问题，通过近似算法可以获得至少2倍于最优值的调度结果\cite{approximation}。
 而这三个参数中，对于reduce计算阶段的shuffle依赖数目以及该阶段的任务数目都可以通过提取DAG计算框架中的应用信息来获取。
 比如Spark在生成RDD的转换关系的同时，就可以获取这两者的信息\cite{spark}。
 在此基础上，如果可以对shuffle数据的体积进行相对准确的预测，那么就可以基于此做出一个较优的预调度结果。
@@ -112,7 +114,12 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 比如在Spark中一个由用户自定义的数据分区函数就有可能会使当前已经获取的map任务产生的shuffle数据分布与最终的shuffle数据分布产生巨大的不一致性。
 
 为了更直观地展示这种不一致性，我们对不同的数据集输入在不同分区函数情况下应用线性回归模型预测的结果进行了测试。
-如图
+这两种数据集都被划分成20个分块，并且通过一次map阶段计算后经由不同的分区函数进行分区，其对应的reduce分区数目也是20。
+在图\ref{fig:hash_pre}中，展示了在哈希分区函数对随机数据集进行分区的情况下，线性回归模型的预测情况。
+图\ref{fig:range_pre_sample}则展示了在非常倾斜的数据集中使用范围分区函数进行数据分块的情况下，线性回归模型和采样预测的情况。
+图\ref{fig:prediction_relative_error}则表示在使用与图\ref{fig:range_pre_sample}同样的数据集与分区函数的情况下，线性回归模型的预测结果，采样预测结果的相对真实数据误差。
+由于本文的两个预测方法均用来预测reduce任务输入数据的体积分布，而不需要预测绝对体积，因此为了方便比较，以上图中所有数据都被标准化到0-1之间。
+图\ref{fig:hash_pre}和图\ref{fig:range_pre_sample}中“Observed Distribution”表示在我们随机选取的几个map任务中，这些任务的shuffle结果中对应于各个reduce任务的数据总和的分布。
 
 \begin{figure}[!htp]
     \centering
@@ -129,6 +136,222 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 \begin{figure}[!htp]
     \centering
 	\includegraphics[width=0.6\textwidth]{../../PPoPP-2018/fig/prediction_relative_error.pdf}
-	\bicaption[fig:prediction_relative_error]{Shuffle数据分布预测比较}{Shuffle数据分布预测比较}{Fig}{Prediction Relative Error of Range Partitioner}
+	\bicaption[fig:prediction_relative_error]{范围分区函数下不同预测方法的相对误差}{范围分区函数下不同预测方法的相对误差}{Fig}{Prediction Relative Error of Range Partitioner}
 \end{figure}
+
+可以看到在图\ref{fig:hash_pre}中，因为预测对象是基于随机数据集的哈希分块，所以在“Observed Distribution”中观测到的下阶段每个reduce任务的数据体积与最终真实的数据体积分布比较接近。
+因此，依据这些观测到的一部分shuffle数据的分布来对reduce任务的数据最终输入做一个线性回归的预测具有较高的准确性。
+但是当遇到数据倾斜时，由于当前观测的数据分布代表性不足，使得线性回归在这种情况下会产生巨大的偏差。
+图\ref{fig:range_pre_sample}就是一个极端的例子，可以看到在图中由于当前选取的几个map任务产生的shuffle数据中缺乏5-20的reduce任务数据，因此是的线性回归预测在这里产生了巨大误差。
+为了防止这种情况的发生，我们提出了一种基于水塘抽样算法（Reservoir Sampling)\cite{reservoir}的采样预测方案来缓解数据倾斜带来的预测偏差。
+这里我们对水塘抽样算法做出了改进，对于每一个抽样的map任务数据，我们依据其体积大小赋予了样本不同的权重。
+在对上文提到的$BlockSize_{ji}$：
+\begin{equation}
+	\label{eq:sample}
+	BlockSize_{ji} = {{InputSize_j \times \frac{sample_i}{s \times p}}} \quad (sample_i = number of samples for reduce_i)
+\end{equation}
+如图\ref{fig:shuffle}中的“Sampling”所示，对于map阶段的每个任务的数据块，我们采用经典的水塘抽样算法随机选取$s \times p$个样本，其中$p$表示下一个reduce阶段的任务数目，$s$是一个可以配置的参数。
+采样结束后，map阶段的本地计算任务就会被启动，用来对采样数据进行计算和分区，最终可以获得该map任务对于下阶段$reduce_i$产生的数据量，也就是$sample_i$。
+当每个节点完成本地的采样之后，这些数据会被汇总到中心调度器上进行汇总，而每个map任务对应的数据块体积大小则被作为权重来获得最终的预测分布。
+
+在图\ref{fig:range_pre_sample}中，我们将$s$设置为3。
+可以看到相较于线性回归模型，采样预测的精度即使在数据极端倾斜的场景中也能获得比较不错的结果。
+需要注意的是，图中采样预测的分布曲线与最终真是数据的分布曲线在标准化之后并不是完美的匹配的。
+产生这种波动的原因是该数据样本在shuffle过程中虽然存在严重数据倾斜，但是由于其最终的reduce分布的绝对体积较为接近，因此是的预测结果的波动在标准化到0-1区间之后被放大。
+在本次预测过程当中，预测结果的数值的整体标准差只有0.0015。
+为了进一步说明采样预测的有效性，我们在图\ref{fig:prediction_relative_error}中从预测的绝对体积上比较了两种方法在数据极度倾斜下的表现。
+我们将真实的reduce任务数据体积作为基准，比较不同预测方案得出的每个reduce任务的体积与真实值的相对误差。
+可以发现，采样预测甚至可以在数据体积的绝对值上接近与真实值。
+而相反线性回归模型在这种极端情况下表现就很差。
+
+虽然采样预测能够提供非常好的精确性，但是由于需要在本地对小部分数据进行map阶段的任务计算，因此也会带来额外开销。
+为了避免这种额外开销，采样预测只有在一些容易产生数据倾斜的分区函数时才会被触发，比如范围分区函数，用户自定义的分区函数等。
+对于采样预测带来的开销，我们将在章节\ref{chap:evaluation}中做出详细的测试。
+
+在对shuffle的数据做出预测的同时，考虑到数据本地行的特征，我们还会对每个reduce任务的输入数据中的所有数据来源做一个计算，并算出该数据块中来源最高的数据块的占比。
+即：
+\begin{equation}
+	\label{eq:prob}
+	prob_i = \max_{0 \leq j \leq m} \frac{BlockSize_{ji}}{reduceSize_i} \quad (m = \text{number of map tasks})
+\end{equation}
+这个参数用来表示当该reduce任务被调度到产生$prob_i$这部分数据所在的节点时，将获得最小的通过网络传输的shuffle数据量，即最好的本地性。
+因此在接下来的算法中，改参数也会作为提高shuffle效率的一部分因素来影响调度的最终结果。
+
+\subsection{启发式预调度}
+\label{subsec:schedule}
+
+当取得对于reduce任务的输入数据预测结果之后，就需要对这些任务进行预调度，从而实现shuffle数据的预取。
+如果不考虑本地性，那么任务的调度只需要根据预测结果做出一个负载相对均衡的方案即可。
+而这种任务到节点的调度问题不考虑本地性的情况下就可以转化成经典的makespan问题，从而通过近似算法求得一个较优解\cite{approximation}。
+这些近似算法已经被证明至少不会差于最优解的2倍。
+但是如果考虑到本地性，使得任务完成时间仅仅依靠数据大小这个关联被打破。
+因为存在两中负载相同的调度，由于本地性的不同使得网络数据传输量不同，那么对于数据传输量较大的方案，即本地性较差的调度方案，其任务完成时间受到网络传输延迟的影响的可能性就更大。
+这个本身就是NP难的调度问题就会变得更加复杂。
+为了解决这个问题，我们提出了一个综合考虑本地性以及负载均衡的启发式算法来针对单个shuffle依赖的reduce阶段的任务进行预调度（Heuristic MinHeap算法\ref{hminheap}）。
+对单个shuffle依赖的启发式调度算法主要可以分为两轮的调度。
+在第一轮调度中（即算法\ref{hminheap}中的第一个while循环），算法首先根据对reduce任务数据体积的预测结果将其进行按体积降序排序。
+同时，我们采用了一个最小堆来维护集群中的节点，这个最小堆的排序比较依据便是调度到该节点上的所有任务体积之和。
+经过这一轮调度之后，一些计算量较大的reduce任务将会被均匀的分散调度到不同节点上，同时尽量保证了各个节点之间的负载均衡。
+在第二轮的调度中，算法会根据数据本地性这个属性来对第一轮已经完成的任务--节点映射关系做出调整。
+算法中的$SWAP\_TASK$函数只有在任务当前分配的节点（算法中$assign\_id$）的与数据本地性最好的节点（算法中的$host\_id$）不匹配时才会被触发。
+对于一个shuffle数据最多有$prob$比例来自于$host$的reduce任务，算法通过标准化计算出了$norm$作为该任务可以用来用来换取数据本地性的性能开销极大值。
+通过这个标准化计算使得任务在用牺牲系能换取更好的本地性的同时，不会使得性能的损失超过原先该reduce计算阶段的10\%。
+该算法通过结合应用预测负载与数据本地信息可以在保证负载均衡的同时获取一个相对较好的本地性。
+即使相较于Spark原生的FIFO调度策略\cite{sparksource}，本算法在负载和数据本地性上都能获得更优的效果。
+我们同样使用了OpenCloud的公开日志作为输入测试了该算法的效果。
+如图\ref{fig:sim}中“Heuristic MinHeap”的曲线所示，本算法可以获得相较于Spark原生算法更好的性能提升。
+相较于Spark调度算法2.7\%的性能提升，算法\ref{hminheap}平均可以获得5.7\%的性能提升。
+这个更均匀的负载也是在基于应用上下文的情况下对shuffle数据做出预测后的调度所获得的一个附加的优势。
+
+\begin{algorithm}[H]
+\caption{单个shuffle依赖的启发式调度}
+\label{hminheap}
+	\begin{algorithmic}[1]
+	\small
+	\Procedure{\Large schedule}{$m, host\_ids, p\_reduces$}
+		\State $m\gets$ partition number of map tasks
+		\State $R\gets$ sort $p\_reduces$ by size in descending order
+		\State $M\gets$ min-heap $\left\{ host\_id \rightarrow \left( \left[ reduces \right], size \right) \right\}$
+		\State $idx\gets$ len$\left(R\right) - 1$
+		\While{$idx \geq 0$}
+		\Comment{Schedule reduces by MinHeap}
+		\State $M\left[0\right].size \mathrel{+}= R\left[idx\right].size$
+		\State $M\left[0\right].reduces.append\left(R\left[idx\right]\right)$
+		\State $R\left[idx\right].assigned\_host \gets M \left[0\right].host\_id$
+		\State Sift down $M\left[0\right]$ by $size$
+		\State $idx\gets idx-1$
+		\EndWhile
+		\State $max\gets$ maximum size in $M$
+		\State Convert $M$ to mapping $\left\{ host\_id \rightarrow \left( \left[ rid\_arr \right], size \right) \right\}$
+		\ForAll{$reduce$ in $R$}
+		\Comment{Heuristic swap by locality}
+			\If{$reduce.assigned\_id \neq reduce.host\_id$}
+				\State $p\gets reduce.prob$
+				\State $norm\gets \left(p-1/m\right)/\left(1-1/m\right)/10$
+				\State $upper\_bound \gets \left(1 + norm\right) \times max$
+				\State SWAP\_TASKS$\left(M, reduce, upper\_bound\right)$
+			\EndIf
+		\EndFor
+		% \Comment{$m$ is the number of input data}
+		% \Comment{$r$ is partition number of reduces}
+		% \Comment{$hosts$ is array of (hostid, partitionids[], size)}
+		% \Comment{$c$ is $r*m$ array of composition data}
+		% \Comment{$pSize$ is $r$ size array of predicted size of reduces}
+		\Return $M$
+	\EndProcedure
+	\Procedure{\Large swap\_tasks}{$M, reduce, upper\_bound$}
+		\State $reduces \gets M\left[reduce.host\_id\right].reduce$	
+		\State $candidates \gets$ Select from $reduces$ that $assigned\_id \neq host\_id$ \textbf{and} total size closest to $reduce.size$
+		\State $\Delta size \gets sizeOf\left(candidates\right) - reduce.size$
+		\State $size\_host \gets M\left[reduce.host\_id\right].size - \Delta size$
+		\State $size\_assigned \gets M\left[reduce.assigned\_id\right].size + \Delta size$
+		\If{$size\_host\leq upper\_bound$ \textbf{and} \\
+			\qquad \; $size\_assigned\leq upper\_bound$}
+			\State Swap $candidates$ and $reduce$
+			\State Update $size$ in $M$
+			\State Update $assigned\_host$ in $candidates$ and $reduce$
+		\EndIf
+	\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection{处理多shuffle的依赖}
+
+在目前对大数据应用日益复杂的前提下，分布式DAG计算框架也相应的提供了更复杂的计算逻辑支持。
+为了满足这些复杂逻辑支持，使得在DAG中一个计算阶段对多个shuffle依赖的情况广泛存在。
+在\ref{subsec:schedule}中提到的方法只能解决对于单个正在执行的shuffle的数据预测与相应的任务预调度。
+在多个shuffle依赖的情境中，对于没有被执行的那些shuffle依赖，因为还不存在map任务的部分执行结果，也没办法对其进行采样，因而不能对这些shuffle的数据做出预测。
+其中一种解决这个困境的方案就是让DAG计算框架对所有shuffle依赖的全部map阶段任务进行同时调度。
+但是这么做会带来不可忽视的额外开销，比如因为每个阶段map任务的逻辑不同，所以在执行器执行任务过程中，这种同时调度的方式就会带来在JVM中任务额外的序列化开销。
+而目前DAG框架为了减少重复地对任务代码进行序列化，都只采用了一个计算阶段内部任务的并行。
+因此为了防止破坏这些DAG计算框架提供的优化执行方案，我们设计了一种累计的启发式调度算法（算法\ref{mhminheap}）来处理对于多个shuffle依赖的reduce任务预调度。
+
+具体过程如$M\_SCHEDULE$函数中所描述的。算法会记录经过若干轮的调度之后，当前每个节点所积累的reduce任务数据量，即算法中的$shuffles$变量。
+当一个新的shuffle依赖中的map计算阶段开始执行，$M\_SCHEDULE$就会被调用，并且根据之前调度结果的累计进行新一轮的调度。
+首先算法会先将新一轮的预测shuffle数据分布与之前的累积值进行相加，从而更新每个reduce任务中（$p_reduce$）相应的$prob$值和对应的$host$。
+更新之后便会调用算法\ref{hminheap}中的$SCHEDULE$函数进行新一轮的任务预调度。
+而当新的预调度结果产生之后，算法就能获取一个新的任务--节点的映射关系。
+对于那些任务中新分配的节点（$assigned\_host$）与之前一轮调度中分配的节点不同的任务，算法会触发一次网络重传，将原先已经预取到旧的节点上的数据重新传输到新分配的节点（re-shuffle）。
+Re-shuffle的过程会引入额外的开销，但是由于前阶段的shuffle数据累计使得更新后原节点往往是本地性最好的节点，并且$prob$参数会比较大。
+因此在$SWAP\_TASKS$的时候，新一轮调度的节点仍有可能通过置换被重新调度回原先的节点，从而使在不破坏负载均衡的同时将re-shuffle的开销降到最低。
+
+
+\begin{algorithm}[H]
+	\caption{多shuffle依赖的累计启发式调度}
+	\label{mhminheap}
+	\begin{algorithmic}[1]
+		\small
+		\Procedure{\Large m\_schedule}{$m, host\_id, p\_reduces, shuffles$}
+			\State $m\gets$ partition number of map tasks
+			\Comment $shuffles$ is the previous schedule result
+			\ForAll{$r$ in $p\_reduces$}
+				\State $r.size \mathrel{+}= shuffles\left[r.rid\right].size$
+				\If{$shuffles\left[r.rid\right].size\geq r.size \times r.prob$}
+					\State $r.prob\gets shuffles\left[r.rid\right].size / r.size$
+					\State $r.host\_id\gets shuffles\left[r.rid\right].assigned\_host$
+				\EndIf
+			\EndFor
+			\State $M\gets$ $SCHEDULE\left(m, host\_id, p\_reduces\right)$
+			\ForAll{$host\_id$ in $M$}
+				\Comment Re-shuffle
+				\ForAll{$r$ in $M\left[host\_id\right].reduces$}
+					\If{$host\neq shuffles\left[r.rid\right].assigned\_host$}
+					\State Re-shuffle data to $host$
+					\State $shuffles\left[r.rid\right].assigned\_host\gets host$
+					\EndIf
+				\EndFor
+			\EndFor
+			\Return $M$
+		\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+
+\section{基于应用上下文的内存管理}
+
+在第\ref{chap:observations}中提到了关于shuffle数据体积的观察。
+虽然shuffle数据相较于应用的输入数据体积较小，而且当前用于计算的内存也日益增大，但是我们仍然需要对shuffle数据在内存中的缓存进行精细的管理，防止其过多占用内存而影响DAG计算框架的执行性能。
+为了缓存数据，首先需要在节点内存中占用一部分内存作为存储shuffle的专用内存空间。
+我们将在\ref{chap:impl}中来探讨对内存的具体占用体积。
+当其中缓存的shuffle数据超过占用的内存体积时，需要将一部分数据先保存到硬盘上，并且在这部分数据被使用之前重新将他们放入内存中。
+为了实现内存缓存对性能提升的最大化，我们在这里结合了DAG计算框架调度任务的特点，提出了两条管理shuffle内存的规则：全部或者没有（all-or-noting）和基于上下文的优先级。
+
+\subsection{全部或没有规则}
+
+毫无疑问shuffle的内存缓存可以加速一个reduce任务的执行，但是对于整个reduce计算阶段的其中一个或者几个任务加速并不足以缩短整个reduce计算阶段的完成时间。
+根据BSP模型的限制，整个计算阶段的完成时间取决于该阶段中最慢的任务的完成时间。
+同时，基于\ref{chap:observations}中的观察，一个计算阶段往往含有多轮次的任务执行。
+如果一轮执行中的一个任务因为没有得到内存缓存的优化而因此成为了该轮任务中新的瓶颈，那么对于其他任务的内存缓存优化效果就完全起不到加快本轮任务执行的作用。
+论文PACMan\cite{pacman}在研究中也证明对于多轮的计算阶段与工作，它们的完成时间只会在当有“$n \times$一轮中任务的数目”个任务同时获得数据缓存时才会按阶段为单元产生步进。
+因此对于shuffle数据的缓存，需要同时满足至少当前一轮所有任务的需求，否则其数据缓存就没有意义。
+我们讲这个规则称为全部或没有规则（all-or-nothing constraint）。
+
+根据全部或没有的规则限制，在shuffle数据的缓存中，SCache的会根据调度算法的调度结果和来决定reduce计算阶段每一轮任务的边界。
+对于shuffle数据块，它们会按照这些任务的边界被划分成一个更小的调度单元，称为shuffle数据单元。
+即对于一个shuffle中的所有数据块，其中属于某一轮reduce任务输入的数据块将会是内存缓存调度机制的最小单位。
+对于那些未完成的shuffle数据缓存单元，即这些已经预取到目的节点的shuffle数据不能满足其所对应的一轮reduce任务的所有输入的单元，它们会被设置为最低的优先级。
+
+
+\subsection{基于上下文的优先级}
+
+在对shuffle进行缓存时，因为shuffle数据只会被计算任务使用一次，而经典的缓存替换策略中，往往需是以提升缓存命中率为目标，因此不能借鉴传统的缓存替换算法比如MIN\cite{min}。
+于此同时，这些经典的算法因为是对每一个数据块进行缓存和移除的操作，因而很容易破坏前面提到的全部活没有规则。
+在这里SCache充分利用了应用的上下文信息，当用来缓存的内存空间饱和时来选择被剔除的内存shuffle数据缓存。
+
+对于不同shuffle数据的优先级，SCache首先需要搜索集群中未完成的shuffle数据单元，将集群中所有属于该单元的shuffle数据写入到磁盘中来释放内存空间。
+如果所有的shuffle数据单元都是完整的，SCache就会从另外两方面来对这些存储单元进行优先级的排序：shuffle之间的优先级与shuffle内部的数据单元的优先级。
+
+\begin{itemize}
+	\item Shuffle之间的优先级：在决定shuffle之间存储单元的优先级时，SCache会根据DAG计算框架的调度算法来设置。
+	比如，对于Spark的调度算法FIFO（先进先出），先提交的计算阶段会先被调度和执行，因此SCache也会根据任务提交时间来设置shuffle的优先级。
+	对于先提交的reduce阶段的任务，它们依赖的shuffle其中的存储单元就会被赋予较高的优先级。
+	而对于Spark的FAIR（公平调度）调度算法，Spark会尽量平衡每个计算阶段的已经执行的任务数量。
+	所以对于相应的shuffle存储单元，如果其对应的计算阶段的剩余任务较多，也就是剩余的shuffle的存储单元更多，那么相应的shuffle优先级就更高。
+	对于其他的DAG计算框架，同样也可以结合任务调度算法来设置shuffle之间的优先级。
+	\item Shuffle内部的优先级：对于shuffle内部的不同存储但愿，SCache同样需要决定之间的优先级。
+	对于shuffle内部存储单元，它们的优先级将根据任务的ID决定。因为在任务的调度中，会把较小的ID赋值给先执行的任务。
+	因此对于shuffle的内部的存储单元，与之对应的任务一轮任务的ID值更小，它们对应的优先级就更高。
+\end{itemize}
+
+
+
 
