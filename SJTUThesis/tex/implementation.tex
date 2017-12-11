@@ -68,9 +68,20 @@ SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息
 递归寻找的过程会在当一个RDD的数据已经被计算或者已经到了存储系统的部分就会停止。
 而这些计算阶段则最终组成了计算过程中的DAG逻辑。
 
-对于DAG中相邻计算阶段之间的shuffle依赖，它们会被打包成一个RPC的调用提交到SCache的从属调度器上。如表\ref{apis}中，一个shuffle依赖需要包含一个唯一的整数ID，分区函数的类型，shuffle对应的map阶段任务数以及reduce阶段的任务数。
+对于DAG中相邻计算阶段之间的shuffle依赖，它们会被打包成一个RPC的调用提交到SCache的从属调度器上。如表\ref{apis}中，一个shuffle依赖需要包含一个唯一的整数ID代表该工作，同时需要包含这个shuffle依赖中每个shuffle的ID，以及它们对应的分区函数的类型，map阶段任务数和reduce阶段的任务数。
 在收到一次RPC提交之后，SCache的从属调度器会首先检查分区函数的类型，如果不是哈希分区函数，就会通过在Spark的Driver上的守护进程在Spark执行该计算阶段前插入一段采样程序。
 我们会在章节\ref{sec:sampling}中详细阐述这个过程。
+
+对于一个哈希分区函数的map任务，当计算结束之后分区函数会将计算产生的键值对通过相应的哈希函数划分成不同的数据块。
+对于每一个数据块，SCache在Spark系统中的daemon程序都会根据其所在的工作ID对应的shuffle依赖ID，map任务ID，和reduce任务ID对每个数据块进行一个唯一的编号（即\ref{tab:apis}中的blockId）。
+在此之后daemon程序会首先通过远程过程调用（Remote Procedure Call）的方式将这些shuffle数据块的元数据发送给SCache本地节点的工作进程。
+于此同时，daemon进程也会通过Java对象的序列化的方式，将相应的数据序列化成字节码。
+当接受到元数据之后，SCache的本地进程就会通过内存拷贝的形式，将序列化之后的字节码数据从Spark执行器的Java虚拟机的内存空间通过daemon程序拷贝到外部SCache的内存空间。
+一旦内存拷贝结束，该map任务所占用的计算资源（slot）就会被立即释放。
+通过SCache此处的内存拷贝优化，使得原先阻塞的磁盘I/O操作被避免，从而实现了map任务端更细粒度的硬件资源管理，提高了硬件资源的利用率和复用率。
+
+在SCache的本地进程获取了该map任务输出的shuffle数据块之后，它会通过SCache系统内部的RPC接口通知SCache的主节点，并且在通知中附上了该map任务对于所有reduce任务产生的shuffle数据块大小（如图\ref{fig:shuffle}中的“map output”）。
+每个数据块的大小可以通过内存拷贝时每个“blockId”对应的字节数组的长度来获得（即接口\ref{tab:apis}中putBlock的参数data: Array[Byte]）。
 
 \section{水塘抽样}
 \label{sec:sampling}
