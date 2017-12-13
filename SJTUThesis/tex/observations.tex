@@ -81,6 +81,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 这些因素都会减慢shuffle读取的速率，延长了shuffle读取过程，进而损害了reduce阶段的性能。
 
 \subsection{低效率的磁盘操作}
+\label{subsec:size}
 
 在整个shuffle过程中，至少存在两次磁盘操作，即map阶段的shuffle数据写入磁盘和reduce阶段从远程磁盘读取shuffle数据。
 在前文中提到的粗粒度的资源分配机制是的计算任务中的I/O操作都会阻塞CPU内存等计算资源的释放和利用。

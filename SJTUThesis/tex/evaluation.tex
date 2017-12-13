@@ -5,3 +5,52 @@
 
 \chapter{实验分析}
 \label{chap:evaluation}
+
+本章节将通过综合性的负载和评测软件来测试SCache对Spark性能的优化效果。
+首先我们运行了一个只包含一个shuffle的简单DAG工作来分析硬件利用率的变化。
+同时也从改工作中具体每个任务的角度来分析SCache的优化带来的影响。
+之后我们使用了一个公认的含有大量shuffle数据的测试程序Terasort\cite{terasort}来测试不同分区函数下SCache带来的优化。
+
+为了证明SCache能在真实生产环境中带来性能的提升，我们也通过Spark TPC-DS\footnote{https://github.com/databricks/spark-sql-perf}的测试程序来对SCache的优化效果进行测试。
+
+最后我们测试了有权重的水塘采样过程给Spark计算带来的开销。
+
+简短来讲，在SCache的帮助下，可以减少Spark计算过程中89\%的shuffle时间开销。
+同时，在单shuffle的DAG程序中，SCache可以帮助Spark实现在reduce阶段75\%的性能提升。
+对于Terasort的reduce阶段，在SCache的帮助下可以实现50\%的性能提升。
+并且通过启发式预调度算法，相较于Spark调度所产生的经过网络的shuffle数据体积，SCache的优化在加快reduce阶段执行的同时并不会引入额外的网络负载。
+在标准的分布式数据库查询评测程序TPC-DS的测试中，经过SCache对shuffle的优化，可以为其中的查询提供接近40\%的平均查询时间优化，效果十分显著。
+
+\section{实验平台搭建}
+
+我们在目前应用广泛的Spark分布式计算框架1.6.2版本中实现了SCache的守护进程，并且通过修改Spark任务调度器（DAGScheduler和TaskSchedulerImpl）来实现了对DAG中shuffle信息和相关任务信息的提交，SCache附属调度器调度结果的获取和采样程序的插入等。
+同时，我们租用了亚马逊AWS EC2中50个m4.xlarge类型的节点作为测试平台，并且部署修改后的Spark和SCache。
+每个节点的配置如下表所示：
+\begin{table}[!hpb]
+    \centering
+    \bicaption[tab:ec2]{测试平台节点配置}{测试节点平台配置}{Table}{Configuration of Testbed Instance}
+    \begin{tabular}{ | m{5cm} | m{8cm} | }
+        \hline
+        \multicolumn{2}{| c |}{Configuration of Testbed Instance}\\ [0.5ex]
+        \hline
+        \hline
+        Instance Type & m4.xlarge \\ \hline
+        CPU & 2.3 GHz Intel Xeon E5-2686 v4 (Broadwell) / 2.4 GHz Intel Xeon E5-2676 v3 (Haswell) \\ \hline
+        vCPU & 4 \\ \hline
+        Memory & 16GB \\ \hline
+        Storage & 8GB SSD, bandwidth 750 Mbps \\ \hline
+        Network Bandwidth & N/A, ($\sim$300Mbps as we tested) \\ \hline
+        OS & Ubuntu 14.04 LTS \\ \hline
+        \hline
+    \end{tabular}
+\end{table}
+
+其中每个计算节点为一个EC2的虚拟实例，包含了4个vCPU以及16GB的内存和8GB的SSD存储。
+以上这些硬件性能保证了在测试过程中计算和内存不会限制测试程序的计算运行速度，同时也为shuffle数据的缓存提供了较充足的内存空间。
+为了为Spark计算提供存储资源，我们还在集群上部署了Hadoop 2.7\cite{hadoop}来提供HDFS的分布式文件系统支持。
+除此之外，我们在集群上的每个节点部署了采集CPU磁盘网络等硬件资源利用情况的程序。
+
+\section{单shuffle依赖的DAG执行分析}
+
+我们首先展示了运行与图\ref{fig:util}中一样的，只包含一个shuffle依赖的Spark程序，即Spark GroupByTest\cite{sparksource}。
+
