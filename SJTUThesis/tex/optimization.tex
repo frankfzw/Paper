@@ -66,14 +66,14 @@
 
 \begin{figure}[!htp]
     \centering
-    \begin{minipage}[t]{0.55\textwidth}
-	    \includegraphics[width=\textwidth]{../../PPoPP-2018/fig/sim.pdf}
-	    \bicaption[fig:sim]{基于OpenCloud日志的计算阶段完成时间提升}{基于OpenCloud日志的计算阶段完成时间提升}{Fig}{Stage Completion Time Improvement of OpenCloud Trace}
-    \end{minipage}
-    \begin{minipage}[t]{0.4\textwidth}
-	    \includegraphics[width=\textwidth]{../../PPoPP-2018/fig/reduce_cdf.pdf}
-	    \bicaption[fig:cdf]{OpenCloud日志中shuffle时间占比累积分布}{OpenCloud日志中shuffle时间占比累积分布}{Fig}{Shuffle Time Fraction CDF of OpenCloud Trace}
-    \end{minipage}
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/sim.pdf}
+	\bicaption[fig:sim]{基于OpenCloud日志的计算阶段完成时间提升}{基于OpenCloud日志的计算阶段完成时间提升}{Fig}{Stage Completion Time Improvement of OpenCloud Trace}
+\end{figure}
+
+\begin{figure}[!htp]
+    \centering
+	\includegraphics[width=0.5\textwidth]{../../PPoPP-2018/fig/reduce_cdf.pdf}
+	\bicaption[fig:cdf]{OpenCloud日志中shuffle时间占比累积分布}{OpenCloud日志中shuffle时间占比累积分布}{Fig}{Shuffle Time Fraction CDF of OpenCloud Trace}
 \end{figure}
 
 虽然这是一个轻量shuffle的工作日志，但是在模拟中我们发现随机调度算法仅仅只能在只有一轮计算任务的情况下获得一个较好的性能提升。

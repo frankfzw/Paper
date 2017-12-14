@@ -79,27 +79,15 @@ SCache的优化在map阶段平均可以带来约10\%的性能提升。
 两者相结合，在对单shuffle依赖的工作的优化过程中，SCache可以减少大约89\%的平均shuffle时间开销。
 
 \begin{figure}[!htp]
-    \centering
-    \begin{minipage}[t]{0.47\textwidth}
-	    \includegraphics[width=\textwidth]{../../PPoPP-2018/fig/groupbymapstage.pdf}
-	    \bicaption[fig:groupbymapstage]{单shuffle依赖工作的map阶段完成时间比较}{单shuffle依赖工作的map阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
-    \end{minipage}
-    \begin{minipage}[t]{0.47\textwidth}
-	    \includegraphics[width=\textwidth]{../../PPoPP-2018/fig/groupbyreducestage.pdf}
-	    \bicaption[fig:groupbyreducestage]{单shuffle依赖工作的reduce阶段完成时间比较}{单shuffle依赖工作的reduce阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
-    \end{minipage}
+	\centering
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbymapstage.pdf}
+	\bicaption[fig:groupbymapstage]{单shuffle依赖工作的map阶段完成时间比较}{单shuffle依赖工作的map阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
 \end{figure}
 
 \begin{figure}[!htp]
-    \centering
-    \begin{minipage}[t]{0.47\textwidth}
-	    \includegraphics[width=\textwidth]{../../PPoPP-2018/fig/groupbymaptask.pdf}
-	    \bicaption[fig:groupbymaptask]{单shuffle依赖工作的map阶段中位任务比较}{单shuffle依赖工作的map阶段中位任务比较}{Fig}{Median Map Task Completion Time of Single Shuffle Test}
-    \end{minipage}
-    \begin{minipage}[t]{0.47\textwidth}
-	    \includegraphics[width=\textwidth]{../../PPoPP-2018/fig/groupbyreducetask.pdf}
-	    \bicaption[fig:groupbyreducetask]{单shuffle依赖工作的reduce阶段中位任务比较}{单shuffle依赖工作的reduce阶段中位任务比较}{Fig}{Median Reduce Task Completion Time of Single Shuffle Test}
-    \end{minipage}
+	\centering
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbyreducestage.pdf}
+	\bicaption[fig:groupbyreducestage]{单shuffle依赖工作的reduce阶段完成时间比较}{单shuffle依赖工作的reduce阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
 \end{figure}
 
 具体到单个计算任务的角度，我们也记录了每个计算阶段中计算任务完成时间处于该阶段所有任务完成时间中位数的那个任务执行过程中具体的时间开销。
@@ -119,6 +107,19 @@ SCache通过在map计算阶段的早期对shuffle数据进行了预取，因此�
 一次在第一轮的reduce任务启动之后，SCache根据任务的预调度信息中的reduce任务ID等信息，已经将数据缓存在了内存当中。
 因此可以看到在图\ref{groupbyreducetask}中，SCache可以通过shuffle数据预取将reduce计算任务开始之前的shuffle读等待时间几乎完全的隐藏起来。
 也就说在SCache结合上下文的任务预调度与shuffle数据预取机制下，网络传输时间被很好的重叠在了map计算阶段和reduce计算阶段启动时期。
+
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbymaptask.pdf}
+	\bicaption[fig:groupbymaptask]{单shuffle依赖工作的map阶段中位任务比较}{单shuffle依赖工作的map阶段中位任务比较}{Fig}{Median Map Task Completion Time of Single Shuffle Test}
+\end{figure}
+
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbyreducetask.pdf}
+	\bicaption[fig:groupbyreducetask]{单shuffle依赖工作的reduce阶段中位任务比较}{单shuffle依赖工作的reduce阶段中位任务比较}{Fig}{Median Reduce Task Completion Time of Single Shuffle Test}
+\end{figure}
+
 
 通过结合map阶段对shuffle数据写的优化以及reduce阶段对shuffle数据读的优化，SCache可以减少Spark的shuffle整体过程大约89\%的shuffle时间开销。
 
@@ -157,6 +158,8 @@ Terasort最初作为一个针对MapReduce集群性能测试的测试程序，目
         (prefix / rangePerPart).toInt
     }
 \end{lstlisting}
+
+
 
 
 
