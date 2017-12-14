@@ -104,6 +104,7 @@ SCache的优化在map阶段平均可以带来约10\%的性能提升。
 
 具体到单个计算任务的角度，我们也记录了每个计算阶段中计算任务完成时间处于该阶段所有任务完成时间中位数的那个任务执行过程中具体的时间开销。
 如图\ref{fig:groupbymaptask}和图\ref{fig:groupbyreducetask}所示，从任务执行过程中在各个部分的开销，能够进一步验证SCache优化过程的有效性。
+
 在图\ref{fig:groupbymaptask}中的map阶段计算任务的执行过程比较中，可以看到通过SCache的将shuffle的磁盘写操作从map计算任务中解耦合之后，通过内存拷贝的方式可以优化大约40\%的shuffle数据写操作的开销。
 之所以SCache的内存拷贝没有完全消除map计算任务中的shuffle写开销是因为在内存拷贝时，首先需要从Spark执行器的Java虚拟机中将shuffle数据移出。
 而shuffle数据在Java虚拟机内存内部则是以Java类对象保存的，因此在将其移出内存空间时需要使用序列化的方法将类对象转换成字节码数组。
@@ -118,6 +119,48 @@ SCache通过在map计算阶段的早期对shuffle数据进行了预取，因此�
 一次在第一轮的reduce任务启动之后，SCache根据任务的预调度信息中的reduce任务ID等信息，已经将数据缓存在了内存当中。
 因此可以看到在图\ref{groupbyreducetask}中，SCache可以通过shuffle数据预取将reduce计算任务开始之前的shuffle读等待时间几乎完全的隐藏起来。
 也就说在SCache结合上下文的任务预调度与shuffle数据预取机制下，网络传输时间被很好的重叠在了map计算阶段和reduce计算阶段启动时期。
+
+通过结合map阶段对shuffle数据写的优化以及reduce阶段对shuffle数据读的优化，SCache可以减少Spark的shuffle整体过程大约89\%的shuffle时间开销。
+
+除此之外，在借助启发式算法的reduce任务预调度之后，SCache相较于Spark默认的FIFO算法，在负载均衡上有更好的表现。
+在Spark默认的FIFO调度算法下，任务调度器会维护一个调度队列来保存当前仍未被执行的计算任务。
+当调度器检测到有计算节点存在计算资源时，就会按照任务ID有小到大一次将任务分配给计算节点。
+而默认情况下，一个CPU核心对应了一个slot执行槽，那么这种调度方式很可能会在初始阶段将几个计算量比较大的任务分配到同一个物理节点上，造成该节点的负载过大。
+之所以会出现这种情况，是因为Spark默认调度算法并没有把每个任务需要的输入数据作为调度的一个参数进行考虑。
+而在SCache的启发式算法中，因为调度时通过任务需要的输入体积来估计任务负载，从而将计算量较大的任务均匀分配到了集群的各个节点上，因此相较于Spark默认调度算法能获得更好的负载均衡。
+这也是预调度在负载均衡上附带来的一部分优化。
+
+\section{Terasort测试}
+
+Terasort最初作为一个针对MapReduce集群性能测试的测试程序，目前被广泛地用来评测分布式并行计算框架以及其所在集群的性能。
+该测试程序主要分为三个部分：数据生成，排序以及验证。
+其中的排序部分被广泛的认为是一个需要大量数据进行shuffle的部分。
+本文采用了Terasort在Spark上的一个实现\cite{terasort}来测试SCache对于Terasort在排序部分的优化效果。
+
+在数据生成部分，Spark Terasort会根据指定的数据集大小，随机生成相应的测试数据，并存放在分布式存储系统，比如HDFS中。
+在数据排序部分，程序首先采用了自定义的哈希分区函数--TeraSortPartitioner来对数据进行分区。
+具体来讲，如代码片段\ref{code:tera}所示，该哈希分区函数结合了用户制定的分区数目（即$numPartitions$），通过对所有随机读入的数据的前缀进行取模计算，从而将该数据划分到对应的reduce计算任务中。
+在此过程中，Spark会执行一次shuffle，将数据分别传输到各个reduce任务所对应的分区。
+在Terasort的第二阶段，上一部执行的RDD会在此处通过调用$sortByKey()$的方法来在上一步已经粗略分区的基础上进行排序。
+在此过程中，Spark首先采用了范围分区函数对现有的RDD进行重新分区，之后就会通过第二次shuffle过程，在reduce阶段对每个分区进行最后的排序。
+范围分区函数在这里保证了reduce阶段每个分区都有明确的上下界，从而保证了分区之间的顺序。
+而由于在第一阶段使用了根据前缀大小的粗略哈希分区，再加上数据生成部分的随机性，使得这一部分真正需要shuffle的数据量非常小，即shuffle的数据具有很强的本地倾斜性。
+根据后续实验，我们发现第二次shuffle的过程中，对于依赖其数据的reduce任务，有93\%的数据是来自于本地某一个map任务的输出。
+因此相较于第一个shuffle，在实验中我们将第二个shuffle作为测试SCache预调度机制在极端数据本地倾斜的情况下的调度结果。
+
+\begin{lstlisting}[language={Java}, caption={Terasort哈希分区函数代码(Scala)}, label={code:tera}]
+    val rangePerPart : Long = (max - min) / numPartitions
+
+    def getPartition(key: Any): Int = {
+        val b = key.asInstanceOf[Array[Byte]]
+        val prefix = Longs.fromBytes(0, b(0), b(1), b(2), b(3), b(4), b(5), b(6))
+        (prefix / rangePerPart).toInt
+    }
+\end{lstlisting}
+
+
+
+
 
 
 
