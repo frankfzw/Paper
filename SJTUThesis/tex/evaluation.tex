@@ -149,7 +149,7 @@ Terasort最初作为一个针对MapReduce集群性能测试的测试程序，目
 根据后续实验，我们发现第二次shuffle的过程中，对于依赖其数据的reduce任务，有93\%的数据是来自于本地某一个map任务的输出。
 因此相较于第一个shuffle，在实验中我们将第二个shuffle作为测试SCache预调度机制在极端数据本地倾斜的情况下的调度结果。
 
-\begin{lstlisting}[language={Java}, caption={Terasort哈希分区函数代码(Scala)}, label={code:tera}]
+\begin{lstlisting}[style={myScalastyle}, caption={Terasort哈希分区函数代码(Scala)}, label={code:tera}]
     val rangePerPart : Long = (max - min) / numPartitions
 
     def getPartition(key: Any): Int = {
@@ -159,14 +159,121 @@ Terasort最初作为一个针对MapReduce集群性能测试的测试程序，目
     }
 \end{lstlisting}
 
+图\ref{fig:tera}展示对于Terasort中第一个shuffle的测试结果。
+这个shuffle是一个典型的有大量网络数据传输的shuffle。
+在10GB到200GB的不同体积的输入数据下，经过SCache任务预调度与shuffle数据预取的优化后，Spark的reduce阶段相较于原始的，阻塞式shuffle读取的执行，可以获得将近2倍的加速。
+这也符合在单shuffle依赖的执行测试中，SCache在reduce阶段的显著优化效果。
 
+图\ref{fig:tera_shuffle}则展示了Terasort中第二个shuffle过程中，SCache与原生Spark分别产生的网络流量。
+通过网络的传输数据比较，可以直接反映出在reduce任务调度过程中是否实现了较好的本地性。
+如前文所述，该shuffle所产生的数据分布是一个具有极强本地性倾斜的数据。
+因此在最优的调度决策下，是将某个reduce任务调度到改任务所需输入数据含量最高的一个节点，从而将通过网络的shuffle传输数据降到最低。
+Spark在进行该轮调度的时候，通过读取RDD每个数据分区的数据本地性依赖来寻找输入数据含量最高的节点，从而将该数据分区所对应的reduce任务调度到对应的节点上，以获得最小的网络数据传输量。
+相对的，SCache则是在map计算阶段通过数据采样的方式来预测shuffle数据的分布，进而预测reduce任务的输入。
+在考虑负载均衡的同时，采用启发式的任务置换方式来获取较好的本地性。
+在图\ref{fig:tera_shuffle}中可以看出在Terasort的第二个shuffle过程中，SCache的预调度与预取策略产生的网络流量几乎与Spark延迟调度后获得的最有效果一致。
+这个实验证明了即使在shuffle数据具有极强的本地性倾斜时，SCache也能通过采样，任务预调度与shuffle预取来获得几乎同样的最优调度结果。
 
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/tera.pdf}
+	\bicaption[fig:tera]{Terasort第一个shuffle中reduce阶段的完成时间}{Terasort第一个shuffle中reduce阶段的完成时间}{Fig}{Redcue Stage Completion Time of First Shuffle in Terasort}
+\end{figure}
 
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/tera_shuffle.pdf}
+	\bicaption[fig:tera_shuffle]{Terasort第二个shuffle中网络传输的数据量}{Terasort第二个shuffle中网络传输的数据量}{Fig}{Size of Shuffle Data through Network of Second Shuffle in Terasort}
+\end{figure}
 
+\section{生产环境的负载测试}
 
+为了测试SCache对shuffle的优化在真实的生产环境中不同负载情况下的优化性能，我们同样也测试了用于评价分布式数据库检索的标准测试程序TPC-DS\cite{tpcds}。
+TPC-DS是一个为数据块查询和数据维持提供通用的模型的测试程序。
+它能够在指定的系统环境和配置下，提供对单一用户数据块查询时间的测试，以及多用户模式下（比如ad-hoc，交互式在线分析查询（OLAP），数据挖掘等）的查询吞吐的测试。
+TPC-DS测试程序通常被业界用来评测大数据系统性能的标准测试程序。
+整个TPC-DS测试程序包含了99个不同的数据块查询测试。
+由于在Spark 1.6.2上的SQL兼容性问题，使得其中有部分查询不能被正确执行。
+所以我们选择了其中一部分可兼容的查询进行测试比较，来观察SCache的shuffle优化效果。
+其中有许多查询因为存在多张表的join操作等，会存在较大数据量的shuffle过程。
 
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=\textwidth]{../../PPoPP-2018/fig/tpcds.pdf}
+	\bicaption[fig:tpcds]{TPC-DS测试程序性能比较}{TPC-DS测试程序性能比较}{Fig}{TPC-DS Benchmark Evaluation}
+\end{figure}
 
+图\ref{fig:tpcds}展示了原生Spark与在SCache优化下的Spark在执行各个查询的总体时间开销比较。
+其中横坐标表示了TPC-DS中的查询测试程序名称，纵坐标则表示每个查询的完成时间。
+可以看到由于shuffle在运行中占用了大量的时间开销，使得经过SCache优化后的Spark能获得极大的性能优化。
+几乎图中所有的测试，在SCache优化下都能取得显著得提升。
+更重要的是，在一些查询测试中，比如q8，q88，q72等，在经过SCache对shuffle的优化后，可以获得将近指数级的性能优化。
+其根本原因是在这些查询中的大量的“union”，“groupby”等SQL语句在Spark上都会通过shuffle的形式来满足这些数据依赖。
+比如图\ref{fig:tpcds}中提升效果最显著的q8，其具体查询代码如代码\ref{code:tpcq8}所示\cite{sparktpcds}：
 
+\begin{lstlisting}[language={SQL}, caption={TCP-DS的q8查询代码片段}, label={code:tpcq8}]
+    select s_store_name, sum(ss_net_profit)
+    from store_sales, date_dim, store,
+        (SELECT ca_zip
+          from (
+          (SELECT substr(ca_zip,1,5) ca_zip FROM customer_address
+             WHERE substr(ca_zip,1,5) IN (
+                  '24128','76232','65084','87816','83926','77556','20548',
+                  '26231','43848','15126','91137','61265','98294','25782',
+                  '...',    -- numbers of integer are omitted
+                  '17871','35258','31387','35458',
+                  '35576'))
+          INTERSECT
+          (select ca_zip
+             FROM
+               (SELECT substr(ca_zip,1,5) ca_zip,count(*) cnt
+                 FROM customer_address, customer
+                 WHERE ca_address_sk = c_current_addr_sk and
+                       c_preferred_cust_flag='Y'
+                 group by ca_zip
+                 having count(*) > 10) A1)
+            ) A2
+         ) V1
+    where ss_store_sk = s_store_sk
+     and ss_sold_date_sk = d_date_sk
+     and d_qoy = 2 and d_year = 1998
+     and (substr(s_zip,1,2) = substr(V1.ca_zip,1,2))
+    group by s_store_name
+    order by s_store_name LIMIT 100
+\end{lstlisting}
 
+可以看到在TPC-DS的q8查询中存在这对大量数据的INTERSECT，gourpby，orderby等操作，这些操作的背后都会存在大量的shuffle，因此在这个测试中，SCache通过对shuffle的优化使Spark在端到端的工作完成时间上获得了巨大的提升。
 
+平均各个查询的完成时间，经过SCache的优化可以使TPC-DS这些查询获得平均40\%的完成时间上的提升。
+在TPC-DS上的实验证明即使对于在真是生产环境中的端到端的任务完成时间，SCache对于shuffle的优化仍让是非常有前景的。
 
+\section{采样的开销}
+
+在这一章节，我们测试了采样过程在整个shuffle优化中的开销。
+对于采样过程的开销，我们主要从两个维度对其进行测量--集群中节点数量和每个节点输入数据的体积。
+其中为了保证系统的可扩展性，采样的开销相对于集群体积的变化规律更为重要。
+因为如果采样的开销会随着集群中节点数量增加而增加的话，即使这种关系是线性的，那么也将极大的影响到SCache的可扩展性。
+虽然系统在设计时采用了主从节点的传统集中式控制模式，但是由于中心节点的负载相对较低，且其所管理的shuffle相关元数据量仅局限于一个DAG工作的运行时间范围，甚至是一个shuffle的时间内，因此其中心节点的负载很难成为整个集群扩展的瓶颈。
+因此采样的开销是否会限制SCache的可扩展性将成文本次测试的重点。
+
+图\ref{fig:sampling}展示了在两个维度下SCache采样过程的开销。
+在相同集群节点数目下，随着每个节点输入数据体积的增加，采样的开销相应的也有所增加（图\ref{fig:sampling}中的点状线）。
+可以看到采样开销与每个节点输入数据量基本成线性关系，这个和采用水塘采样算法进行抽样的算法设计相符，在目前的设计中无法避免。
+因为虽然采样程序（等式\ref{eq:sample}）只对固定样本数的数据进行计算和分区，但是仍然需要统计输入数据中键值对的数量。
+因此随着数据体积增加，开销接近线性的增长也与设计相吻合。
+所幸是采样开销的绝对值相对较低，并不会给整个DAG工作的执行带来很大影响。
+
+而图\ref{fig:sampling}中实线线条所展示的则是在相同的每个节点输入数据体积下，随着集群中节点数量的增加，采样开销的变化。
+可以看到除了在除了在每个节点输入数据体积为0.4GB的情况下，采样开销随着集群中节点数增加有两次的上升以外，在其他体积下，采样数并没有随着集群节点数的增加而上升。
+基本上可以断定采样的开销在集群中节点数目的变化的维度是相对稳定的。
+此处采样开销的稳定主要得益于中心节点对于每个节点采样数据的收集相对简单。
+首先中心节点收集单节点的数据量是固定的，只包含了采样后的输出数据分布和改输入的体积，这些数据并不受节点的输入数据体积影响。
+于此同时，由于单节点所需上传的数据较少，因此对于网络传输也不会带来过高的负载。
+而对于中心节点在基于上述收集数据的计算，我们也考虑到预测算法与预调度算法的复杂性，尽可能的用时间复杂度较低的算法来完成预测和任务预调度。
+综上所述，采样过程的开销在集群节点数的维度上能保持相对稳定，而实验结果也很好的证明了在设计过程中的优化措施，使得中心节点不会成为影响整个集群可扩展性的瓶颈。
+
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=\textwidth]{../../PPoPP-2018/fig/sampling.pdf}
+	\bicaption[fig:sampling]{采样过程的开销}{采样过程的开销}{Fig}{Sampling Overhead}
+\end{figure}

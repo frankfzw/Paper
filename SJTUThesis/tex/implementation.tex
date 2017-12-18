@@ -58,7 +58,8 @@ SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息
         registerShuffles & jobId: Int, shuffleIds: Array[Int], maps: Array[Int], reduces: Array[Int], partitioner: Array[String] & 向SCache注册shuffle \\ \hline
         getBlock & blockId: String & 向SCache获取shuffle的数据块 \\ \hline
         putBlock & blockId: String, data: Array[Byte], len: Int & 向SCache发送shuffle数据块 \\ \hline
-        getShuffleStatus & jobId: Int, shuffleId: Int & 向SCache获取reduce任务的预调度结果 \\
+        getShuffleStatus & jobId: Int, shuffleId: Int & 向SCache获取reduce任务的预调度结果 \\ \hline
+        sampling & jobId: Int, shuffleId: Int, distribution: Array[Array[Float]] & 向SCache发送采样分布 \\ 
         \hline
     \end{tabular}
 \end{table}
@@ -66,6 +67,14 @@ SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息
 \section{工作流程}
 
 接下来我们将介绍在SCache的协同下Spark执行DAG的工作流程。
+工作流程的第一阶段如图\ref{fig:regshuffle}所示，SCache需要首先从Spark中获取DAG的具体信息。
+
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{shuffleregflow.pdf}
+	\bicaption[fig:regshuffle]{注册shuffle时序图}{注册shuffle时序图}{Fig}{Sequence Diagram of Shuffle Registration}
+\end{figure}
+
 当一个Spark的工作启动时，首先会根据用户的代码生成一个关于RDD（Resilient Distributed Datasets）的系带关系（lineage）。
 之后Spark的调度器会从最终的用户RDD递归向前寻找依赖的RDD。
 在RDD之间的数据依赖中，如果存在部分依赖，也就是shuffle依赖，Spark会在此处插入一个shuffle过程，并且将之前的所有RDD合并成一个计算阶段（stage）。
@@ -75,6 +84,14 @@ SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息
 对于DAG中相邻计算阶段之间的shuffle依赖，它们会被打包成一个RPC的调用提交到SCache的从属调度器上。如表\ref{apis}中，一个shuffle依赖需要包含一个唯一的整数ID代表该工作，同时需要包含这个shuffle依赖中每个shuffle的ID，以及它们对应的分区函数的类型，map阶段任务数和reduce阶段的任务数。
 在收到一次RPC提交之后，SCache的从属调度器会首先检查分区函数的类型，如果不是哈希分区函数，就会通过在Spark的Driver上的守护进程在Spark执行该计算阶段前插入一段采样程序。
 我们会在章节\ref{sec:sampling}中详细阐述这个过程。
+
+在之后的map计算阶段任务执行过程中的时序图如图\ref{fig:putblock}所示。
+
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{putblock.pdf}
+	\bicaption[fig:putblock]{Map阶段工作时序图}{Map阶段工作时序图}{Fig}{Sequence Diagram of Map Stage}
+\end{figure}
 
 对于一个哈希分区函数的map任务，当计算结束之后分区函数会将计算产生的键值对通过相应的哈希函数划分成不同的数据块。
 对于每一个数据块，SCache在Spark系统中的daemon程序都会根据其所在的工作ID对应的shuffle依赖ID，map任务ID，和reduce任务ID对每个数据块进行一个唯一的编号（即\ref{tab:apis}中的blockId）。
@@ -88,6 +105,15 @@ SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息
 每个数据块的大小可以通过内存拷贝时每个“blockId”对应的字节数组的长度来获得（即接口\ref{tab:apis}中putBlock的参数data: Array[Byte]）。
 当SCache的主节点收到了足够多的shuffle数据块信息之后（该threshold可以通过配置文件更改），会通过线性回归模型首先对reduce任务的输入数据分布进行预测。
 之后DAG从属调度模块会根据预测数据，调用算法\ref{mhminheap}和算法\ref{hminheap}来对redcue任务进行预调度。
+
+在SCache的中心节点完成预调度之后的流程具体如图\ref{fig:preschedule}所示。
+
+\begin{figure}[!htp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{preschedule.pdf}
+	\bicaption[fig:putblock]{预调度与预取工作时序图}{预调度与预取工作时序图}{Fig}{Sequence Diagram of Pre-scheduling and Pre-fetching}
+\end{figure}
+
 当预调度算法运行结束之后，SCache的主节点会将reduce任务与计算节点的映射关系进行广播。
 每个工作节点的SCache进程收到预调度的信息之后，会根据节点信息做出筛选，选出需要在本地执行的reduce任务。
 此后本地节点会根据相应的工作ID，shuffle依赖ID，map任务ID，以及即将在本地执行的reduce任务ID组合而成的blockId，查询获取该数据块所在的节点位置，之后便开始从该远程节点预取数据。
@@ -147,4 +173,233 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 比如在上文提到的Spark恢复模式中，该失效的RDD分区会进行一个重新分区的并行计算，而在次过程中，SCache对于shuffle的优化将对这部分逻辑进行重新提交和分配。
 通过借助DAG计算框架本身的容错性，SCache能保证在节点下线的恢复过程中不破坏任务的正确性，同时提供对恢复中的shuffle优化。
 
+\section{普适性分析}
 
+为了验证本研究方案的普适性，本章将详细展示在工程方面改造Spark的开销。
+同时也将展示在Hadoop上的可行性分析。
+通过以上两个方面的分析和探索，最终可以证明SCache提供的优化方案可以在不需要大量改造成本的情况下被目前主流的分布式DAG计算框架应用。
+
+\subsection{Spark的实现分析}
+本次实现中，我们利用Spark这个被广泛应用的分布式DAG计算平台来对SCache的优化进行适配。
+在Spark上的修改主要集中在以下几个方面。
+
+首先，我们通过netty\cite{netty}的库在Spark内部实现了一个守护进程--$ScacheDaemon$。
+在$ScacheDaemon$中，我们实现了表格\ref{tab:apis}中的相应接口，具体代码片段如代码\ref{code:daemon}所示。
+其中变量$daemon$是SCache在本地的工作进程，可以通过读取配置文件来获取具体端口，来建立连接，$daemon$本身是一个netty的RPC参考（Reference）实例。
+实现中的所有接口都会通过$daemon$这个RPC的参考实例与本地的工作进程和SCache主节点进行数据交互。
+
+\begin{lstlisting}[style={myScalastyle}, caption={ScacheDaemon代码片段}, label={code:daemon}]
+    private[spark] class ScacheDaemon (conf: SparkConf) extends Logging {
+
+        val scacheHome = conf.get("spark.scache.home", "~/SCache")
+        val platform = "spark"  
+        val daemon = new Daemon(scacheHome, platform)   
+        val reduceStatus = new ConcurrentHashMap[(Int, Int), mutable.HashMap[Int, Array[String]]]() 
+        private var runningJId: Int = -1    
+        def setRunningJId(jid: Int): Unit = {
+          //Set current runing job id
+        }   
+        def getRunningJId: Int = runningJId 
+        def putBlock (blockId: BlockId, data: Array[Byte], rawLen: Int, compressedLen: Int): Boolean = {
+          // Called by Spark Executor
+          // The block data is transfered from JVM space of Spark Executor
+        }   
+        def getBlock(blockId: BlockId): Option[Array[Byte]] = {
+          // Called by Spark Executor
+          // The block data is fetched from memory of SCache to Spark Executor
+        }   
+        def registerShuffles(jobId: Int, shuffleIds: Array[Int], maps: Array[Int], reduces: Array[Int], partitioner: Array[String]): Unit = {
+          // Called by Spark DAG Scheduler
+          // Register shuffle to SCache
+        }   
+        def getShuffleStatus(jobId: Int, shuffleId: Int): mutable.HashMap[Int, Array[String]] = {
+          // Called by Spark Task Scheduler
+          // Get pre-scheduled reduce tasks
+        }   
+    }
+\end{lstlisting}
+
+其次，我们修改了Spark的$DAGScheduler$来实现对DAG信息的获取。
+具体可以参考如代码\ref{code:dagScheduler}。
+在Spark的Driver节点上也存在相应的$Daemon$进程。
+当Spark的$DAGScheduler$在从最终的RDD递归向前建立DAG的过程中（$getParentStages$函数），如果发现RDD之前的依赖关系是shuffle依赖，则通过$env.scacheDaemon.registerShuffles$
+获取本地已经初始话好的守护进程实例，并通过其向SCache提交该shuffle依赖的元数据。
+
+\begin{lstlisting}[style={myScalastyle}, caption={DAGScheduler代码片段}, label={code:dagScheduler}]
+    private[spark] class DAGScheduler(...) extends Logging {
+            // Skip
+            /**
+            * Get or create the list of parent stages for a given RDD.  The new Stages will be created with
+            * the provided firstJobId.
+            */
+           private def getParentStages(rdd: RDD[_], firstJobId: Int): List[Stage] = {
+             val parents = new HashSet[Stage]
+             val visited = new HashSet[RDD[_]]
+             val waitingForVisit = new Stack[RDD[_]]
+             def visit(r: RDD[_]) {
+               if (!visited(r)) {
+                 visited += r
+                 val shuffles = new ArrayBuffer[ShuffleDependency[_, _, _]]
+                 for (dep <- r.dependencies) {
+                   dep match {
+                     case shufDep: ShuffleDependency[_, _, _] =>
+                       parents += getShuffleMapStage(shufDep, firstJobId)
+                       shuffles.append(shufDep)
+                     case _ =>
+                       waitingForVisit.push(dep.rdd)
+                   }
+                 }
+                 if (!shuffles.isEmpty && sc.getConf.getBoolean("spark.scache.enable", false)) {
+                   env.scacheDaemon.registerShuffles(firstJobId, shuffles.toArray, rdd.partitions.length, rdd.partitioner.get.toString)
+                 }
+               }
+             }
+             waitingForVisit.push(rdd)
+             while (waitingForVisit.nonEmpty) {
+               visit(waitingForVisit.pop())
+             }
+             parents.toList
+           }
+    }
+\end{lstlisting}
+
+同时，为了使Spark的执行器在执行map任务与reduce任务时能够和SCache进行数据交互，我们重新实现了一个$ScacheBlockObjectWriter$用来实现map任务的shuffle数据向SCache写入，
+实现了$ScacheBlockTransferService$实现了reduce任务向SCache的shuffle数据读取。
+$ScacheBlockObjectWriter$实现了对Spark原来的$DiskBlockObjectWriter$的继承，并且重载了其中的方法。
+代码\ref{code:writer}展示了$ScacheBlockObjectWriter$在继承过程中比较重要的几个方法重载。
+在这里去掉了原先的磁盘写操作，取代的是对内存缓存空间的数据写入以及内存拷贝，从而优化了map计算任务的磁盘阻塞。
+
+\begin{lstlisting}[style={myScalastyle}, caption={ScacheBlockObjectWriter代码片段}, label={code:writer}]
+    class ScacheBlockObjectWriter (...)extends DiskBlockObjectWriter(...) with Logging{
+      override def open(): DiskBlockObjectWriter = {
+        // Open a byte stream buffer
+      }
+      override def close(): Unit = {
+        // Do memory copy and free memory
+      }
+      override def write(key: Any, value: Any): Unit = {
+        // Write data to byte stream buffer
+      }
+    }
+\end{lstlisting}
+
+而在reduce阶段，我们修改了$ShuffleBlockFetcherIterator$中获取shuffle数据的方法，即调用$ScacheBlockTransferService$中的相应接口来从SCache获取shuffle的数据块。
+虽然此处的数据访问通过内存拷贝来完成，但是为了进一步提高性能，以及预防在网络极端拥塞的情况下，最后一轮的几个map任务的输出shuffle数据仍然没有传输完成，在向SCache获取shuffle数据块的时候，
+采用了多线程异步非阻塞的方式。
+这种实现方式在第一时间能将已经缓存的shuffle数据块返回给Spark的reduce任务进行计算，因而能将获取shuffle数据时产生对计算的阻塞的可能性降到最低。
+代码片段如代码\ref{code:reader}所示。
+
+\begin{lstlisting}[style={myScalastyle}, caption={ScacheBlockTransferService代码片段}, label={code:reader}]
+  class ScacheBlockTransferService(daemon: ScacheDaemon) extends Logging{
+    def fetchBlocks(
+        host: String,
+        port: Int,
+        execId: String,
+        blockIds: Array[String],
+        listener: BlockFetchingListener): Unit = {
+      // Fetch block from SCache
+      // It is a multi-thread asynchronous method that can fetch multiple blocks simultaneously
+    }
+  }
+\end{lstlisting}
+
+在reduce任务预调度方面，Spark的\verb|DAGScheduler.scala|类使其在生成reduce任务时先通过调用RDD的\verb|getPreferedLocs|方法来查询改RDD每个分区对节点的偏好。
+而我们通过修改\verb|ShuffleRDD.scala|的\verb|getPreferedLocs|方法，将SCache预调度的结果通过接口\ref{tab:apis}中\verb|getShuffleStatus|返回给RDD。
+具体过程可以参考代码\ref{code:preschedule}
+获取预调度结果之后，Spark的\verb|TaskSchedulerImpl.scala|就会在调度reduce任务时将其分配到已经完成shuffle数据预取的节点上，从而获得SCache的优化。
+
+\begin{lstlisting}[style={myScalastyle}, caption={Reduce预调度代码片段}, label={code:preschedule}]
+    class ShuffledRDD[...](...){
+        //Skip
+        override protected def getPreferredLocations(partition: Partition): Seq[String] = {
+            if (SparkEnv.get.conf.getBoolean("spark.scache.enable", false)) {
+              val dep = dependencies.head.asInstanceOf[ShuffleDependency[K, V, C]]
+              // Ask SCache to get preferred location
+              val locs = SparkEnv.get.scacheDaemon.getShuffleStatusForPartition(dep.shuffleId, partition.index)
+              locs.toSeq
+            } else {
+              val tracker = SparkEnv.get.mapOutputTracker.asInstanceOf[MapOutputTrackerMaster]
+              val dep = dependencies.head.asInstanceOf[ShuffleDependency[K, V, C]]
+              tracker.getPreferredLocationsForShuffle(dep, partition.index)
+            }
+        }
+    }
+\end{lstlisting}
+
+在插入采样程序部分，我们利用了Spark中$RangePartitioner$在决定分区边界时对RDD进行计算的过程，在其中插入了采样过程。
+为了提高效率，对RDD数据的采样以及分区的计算是在Spark的Driver内部进行。
+计算完成之后再将数据发送给SCache，具体逻辑如代码\ref{code:sample}所示。
+其中返回的$distribution$将会作为采样的分布通过接口\ref{tab:api}中的$sampling$发送个SCache。
+
+\begin{lstlisting}[style={myScalastyle}, caption={水塘采样代码片段}, label={code:sample}]
+    def determineBounds[K : Ordering : ClassTag](
+        candidates: ArrayBuffer[(K, Float, Int)],
+        partitions: Int,
+        depPartitionNum: Int): (Array[K], Array[Array[Int]]) = {
+      // Skip
+      val ordered = candidates.sortBy(_._1)
+      val distribution = Array.fill[Int](depPartitionNum)(0)
+        .map(x => new Array[Float](partitions))
+      var i = 0
+      var j = 0
+      var previousBound = Option.empty[K]
+      while ((i < numCandidates) && (j < partitions - 1)) {
+        val (key, weight, index) = ordered(i)
+        cumWeight += weight
+        distribution(index)(j) += weight
+        if (cumWeight >= target) {
+          // Skip duplicate values.
+          if (previousBound.isEmpty || ordering.gt(key, previousBound.get)) {
+            bounds += key
+            target += step
+            j += 1
+            previousBound = Some(key)
+          }
+        }
+        i += 1
+      }
+      while (i < numCandidates) {
+        // calculate the distribution of last partition
+        val (key, weight, index) = ordered(i)
+        distribution(index)(j) += weight
+        i += 1
+      }
+      (bounds.toArray, distribution)
+    }
+\end{lstlisting}
+
+以上四个部分是在Spark适配过程中做出的主要改动，其代码量大约在1000行左右，相较于Spark本身几十万行的代码量，可以说这个改动是非常的小。
+
+\subsection{Hadoop MapReduce的可行性分析}
+
+受限于时间，本研究并没有对Hadoop MapReduce进行SCache的适配改造。
+但是为了验证SCache对shuffle的优化的普适性，本研究仍对Hadoop MapReduce的适配可行性进行了分析研究。
+
+首先，我们对Hadoop MapReduce的计算过程中存在的shuffle特点进行分析。
+虽然在表达DAG的过程中Hadoop MapReduce与Spark存在较大差异，但是在每个map和reduce的计算阶段之间都会存在一个shuffle的过程却十分接近。
+在执行map任务时，Hadoop MapReduce中的\verb|hadoop/hadoop-mapreduce-project/hadoop-mapreduce-client/.../mapred/MapTask.java|
+会将map任务计算产生的shuffle结果通过\verb|MapOutputClollector|接口写入到本地磁盘进行保存。
+在reduce阶段，每个reduce任务由类\verb|hadoop/hadoop-mapreduce-project/hadoop-mapreduce-client/.../mapred/MapTask.java|来执行。
+具体来说，每个reduce任务会通过\verb|ShuffleConsumerPlugin|的接口来实现第一阶段的远程shuffle数据拷贝过程。
+在目前的MapReduce中，该接口由类\verb|Shuffle<K, V>|实现了一个多线程的异步远程shuffle数据读取。
+而对于任务的调度，在Hadoop MapReduce中，主要由一系列状态机的转移和Yarn的资源调度机制协同完成。
+具体来讲，在一个MapReduce任务被提交之后，经过一系列的状态转移，最终会由\verb|JobImpl|类来完成map和reduce阶段的具体任务生成以及提交。
+而由于MapReduce的计算DAG相较于Spark十分简单，即在一个任务只有Map和Reduce两个过程，所以对于shuffle的相关元数据便可以在此处获得。
+对于reduce阶段的任务预调度，在MapReduce中都是通过\verb|RMContainerAllocator.java|的类来实现的。
+
+综上所述，我们给出了一下对Hadoop MapReduce的SCache适配的改造方案。
+\begin{enumerate}
+    \item Shuffle元数据获取：在\verb|JobImpl|类中\verb|JobStateInternal transition(JobImpl job, JobEvent event)|函数执行过程中，可以获取shuffle两端对应的map任务个数，reduce任务个数等信息。
+    此时，便可以将这些数据通过接口\ref{tab:apis}中的\verb|registerShuffles|进行提交。
+    \item Map任务shuffle数据的解耦：可以通过重新实现一个对接口\verb|MapOutputClollector|的实现类来获取shuffle数据，并且通过内存拷贝传递给SCache。
+    \item Reduce任务shuffle数据的解耦：可以通过重新实现一个接口\verb|ShuffleConsumerPlugin|的实现类来从SCache的内存缓存获取shuffle的数据。
+    \item Reduce任务的预调度：需要将SCache的预调度结果通过接口在\verb|RMContainerAllocator.java|调度任务前对预调度结果进行获取，然后在其调用\verb|addReduce|函数时遵循预调度的结果即可。
+    \item 采样任务的实现：在\verb|JobImpl|类中生成具体任务的时候，可以通过配置信息来获取分区函数的信息。
+    如果发现是一个非哈希的分区函数，则在创建map任务的同时创建每个任务对应的采样任务对其进行数据采样。
+\end{enumerate}
+
+以上两个章节通过对目前最流行的Spark和Hadoop MapReduce这两个典型的分布式DAG计算框架应用SCache优化的可行性做出了具体的分析。
+通过展现Spark上的具体实现技术，可以看到应用SCache的优化对于原有框架本身并不需要做出巨大的修改。
+同时，通过对Hadoop MapReduce的任务执行框架任务调度流程，shuffle过程的分析，我们发现对于SCache提供的优化策略在Hadoop MapReduce上也能非常方便的适配。
+因此我们认为SCache提供的优化方案对于目前主流的分布式DAG计算框架具有较好的普适性。
+能够通过对现有框架较少的改动而实现适配与shuffle的优化。

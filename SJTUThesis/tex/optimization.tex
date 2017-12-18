@@ -258,13 +258,29 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 \subsection{处理多shuffle的依赖}
 
 在目前对大数据应用日益复杂的前提下，分布式DAG计算框架也相应的提供了更复杂的计算逻辑支持。
-为了满足这些复杂逻辑支持，使得在DAG中一个计算阶段对多个shuffle依赖的情况广泛存在。
+如图\ref{fig:oneshuffle}所示，在单个shuffle依赖的情况下，只需要在map阶段的前期对shuffle数据进行预测即可做出reduce阶段的任务预调度与shuffle数据预取。
+
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{../figure/oneshuffle.pdf}
+	\bicaption[fig:oneshuffle]{单shuffle依赖}{单shuffle依赖}{Fig}{Single Shuffle Dependency}
+\end{figure}
+
+而为了满足这些复杂逻辑支持，使得在DAG中一个计算阶段对多个shuffle依赖的情况广泛存在。
+如图\ref{fig:twoshuffles}所示，其中展现了一个存在两个shuffle依赖的reduce计算阶段。
+其中的reduce阶段的任务输入数据最终取决于两个map计算阶段的任务都结束后的输出shuffle数据分布。
 在\ref{subsec:schedule}中提到的方法只能解决对于单个正在执行的shuffle的数据预测与相应的任务预调度。
 在多个shuffle依赖的情境中，对于没有被执行的那些shuffle依赖，因为还不存在map任务的部分执行结果，也没办法对其进行采样，因而不能对这些shuffle的数据做出预测。
 其中一种解决这个困境的方案就是让DAG计算框架对所有shuffle依赖的全部map阶段任务进行同时调度。
 但是这么做会带来不可忽视的额外开销，比如因为每个阶段map任务的逻辑不同，所以在执行器执行任务过程中，这种同时调度的方式就会带来在JVM中任务额外的序列化开销。
 而目前DAG框架为了减少重复地对任务代码进行序列化，都只采用了一个计算阶段内部任务的并行。
 因此为了防止破坏这些DAG计算框架提供的优化执行方案，我们设计了一种累计的启发式调度算法（算法\ref{mhminheap}）来处理对于多个shuffle依赖的reduce任务预调度。
+
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{../figure/twoshuffles.pdf}
+	\bicaption[fig:twoshuffles]{多shuffle依赖}{多shuffle依赖}{Fig}{Multiple Shuffle Dependencies}
+\end{figure}
 
 具体过程如$M\_SCHEDULE$函数中所描述的。算法会记录经过若干轮的调度之后，当前每个节点所积累的reduce任务数据量，即算法中的$shuffles$变量。
 当一个新的shuffle依赖中的map计算阶段开始执行，$M\_SCHEDULE$就会被调用，并且根据之前调度结果的累计进行新一轮的调度。

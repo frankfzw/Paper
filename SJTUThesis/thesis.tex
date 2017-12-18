@@ -21,6 +21,25 @@
 \addbibresource{bib/thesis.bib}
 % \addbibresource{bib/chap2.bib}
 
+\lstdefinestyle{myScalastyle}{
+  frame=tb,
+  language=scala,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{cyan},
+  stringstyle=\color{purple},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3,
+}
+
 \begin{document}
 
 %% 无编号内容：中英文论文封面、授权页
@@ -74,7 +93,7 @@
 \include{tex/evaluation}
 % \include{tex/example}
 % \include{tex/faq}
-% \include{tex/summary}
+\include{tex/summary}
 
 \appendix	% 使用英文字母对附录编号，重新定义附录中的公式、图图表编号样式
 % \renewcommand\theequation{\Alph{chapter}--\arabic{equation}}	
@@ -117,11 +136,11 @@
     \include{tex/projectsreview}
   \else
     \include{tex/pub}	      %% 发表论文
-    \include{tex/projects}  %% 参与的项目
+    % \include{tex/projects}  %% 参与的项目
   \fi
 \fi
 
-% \include{tex/patents}	  %% 申请专利
+\include{tex/patents}	  %% 申请专利
 % \include{tex/resume}	  %% 个人简历
 
 \makeatother
