@@ -69,7 +69,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 但是当前这种主流的粗粒度资源分配方式为了满足任务在不同阶段的需求，只能舍弃一部分硬件资源的率用率。
 因此要改变这种资源与需求的不匹配，必须提供一种更细粒度的资源分配机制。
 
-\subsection{同步的shuffle读取}
+\subsection{同步滞后的shuffle读取}
 
 在目前的主流分布式DAG计算框架中，大多采用了Bulk Synchronous Parallel（BSP）模型来控制每个计算阶段。
 因此当图\ref{fig:util}中的reduce阶段被调度时，集群中所有节点都会同时启动reduce任务。

@@ -74,6 +74,7 @@
 \end{enumerate}
 
 \section{国内外研究现状}
+\label{sec:relatedwork}
 
 目前国内外的对shuffle的优化工作主要分成三个方向：提前调度，延迟调度和纯网络层面的优化。
 
@@ -93,8 +94,9 @@ ShuffleWatcher\cite{shufflewatcher}会在网络将近饱和的时候延迟shuffl
 Quincy\cite{quincy}和Fair Scheduling\cite{preemptive}都可以通过优化map任务的调度来获取更好的shuffle数据本地性。
 但是以上这些工作都不能消除在计算任务中显示的I/O操作。更重要的是，他们的优化效果会因为网络的性能好坏和计算数据的不同分布而产生波动。
 
-\textbf{网络层优化}：Varys\cite{varys}和Aalo\cite{aalo}都能结合应用层信息提供shuffle在网络传输时的优化，从而加快shuffle的传输过程。
-虽然这些优化仅仅局限在shuffle过程中的网络传输过程，但是这些共工作可以为本研究的优化提供进一步的性能提升。
+\textbf{网络层优化}：Varys\cite{varys}，Aalo\cite{aalo}，CODA\cite{coda}，Seagull\cite{seagull}都能结合应用层信息提供shuffle在网络传输时的优化，从而加快shuffle的传输过程。
+而DCTCP\cite{dctcp}，pFabric\cite{pfabric}，Pias\cite{pias}，CONGA\cite{conga}等工作能结合数据中心网络的特点在纯网络层降低网络流的平均完成时间，增加网络吞吐。
+虽然这些优化仅仅局限在shuffle过程中的网络传输部分，但是它们可以为本研究的优化提供进一步的性能提升。
 
 \section{文章结构}
 

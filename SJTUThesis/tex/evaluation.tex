@@ -80,13 +80,13 @@ SCache的优化在map阶段平均可以带来约10\%的性能提升。
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbymapstage.pdf}
+	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbymapstage.pdf}
 	\bicaption[fig:groupbymapstage]{单shuffle依赖工作的map阶段完成时间比较}{单shuffle依赖工作的map阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
 \end{figure}
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbyreducestage.pdf}
+	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbyreducestage.pdf}
 	\bicaption[fig:groupbyreducestage]{单shuffle依赖工作的reduce阶段完成时间比较}{单shuffle依赖工作的reduce阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
 \end{figure}
 
@@ -110,13 +110,13 @@ SCache通过在map计算阶段的早期对shuffle数据进行了预取，因此�
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbymaptask.pdf}
+	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbymaptask.pdf}
 	\bicaption[fig:groupbymaptask]{单shuffle依赖工作的map阶段中位任务比较}{单shuffle依赖工作的map阶段中位任务比较}{Fig}{Median Map Task Completion Time of Single Shuffle Test}
 \end{figure}
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/groupbyreducetask.pdf}
+	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbyreducetask.pdf}
 	\bicaption[fig:groupbyreducetask]{单shuffle依赖工作的reduce阶段中位任务比较}{单shuffle依赖工作的reduce阶段中位任务比较}{Fig}{Median Reduce Task Completion Time of Single Shuffle Test}
 \end{figure}
 
@@ -176,13 +176,13 @@ Spark在进行该轮调度的时候，通过读取RDD每个数据分区的数据
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/tera.pdf}
+	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/tera.pdf}
 	\bicaption[fig:tera]{Terasort第一个shuffle中reduce阶段的完成时间}{Terasort第一个shuffle中reduce阶段的完成时间}{Fig}{Redcue Stage Completion Time of First Shuffle in Terasort}
 \end{figure}
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/tera_shuffle.pdf}
+	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/tera_shuffle.pdf}
 	\bicaption[fig:tera_shuffle]{Terasort第二个shuffle中网络传输的数据量}{Terasort第二个shuffle中网络传输的数据量}{Fig}{Size of Shuffle Data through Network of Second Shuffle in Terasort}
 \end{figure}
 
@@ -274,6 +274,6 @@ TPC-DS测试程序通常被业界用来评测大数据系统性能的标准测�
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=\textwidth]{../../PPoPP-2018/fig/sampling.pdf}
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/sampling.pdf}
 	\bicaption[fig:sampling]{采样过程的开销}{采样过程的开销}{Fig}{Sampling Overhead}
 \end{figure}

@@ -6,7 +6,7 @@
 \chapter{Shuffle的优化策略}
 \label{chap:optimization}
 
-本章将详细阐述实现shuffle优化的方法论。
+本章将详细阐述实现shuffle优化的方法论，并且依据这些方法整合行程具体优化系统---SCache。
 首先SCache通过提供shuffle读写API的方式来实现shuffle在计算任务中的解耦。
 其次SCache通过对shuffle结合应用上下文的外部管理，实现了一个跨平台的通用优化方案。
 然后SCache通过两个启发式算法来实现对于shuffle依赖的预调度和数据预取，来实现shuffle传输时间的优化。
@@ -368,6 +368,79 @@ Re-shuffle的过程会引入额外的开销，但是由于前阶段的shuffle数
 	因此对于shuffle的内部的存储单元，与之对应的任务一轮任务的ID值更小，它们对应的优先级就更高。
 \end{itemize}
 
+\section{网络层的进一步优化}
+\label{sec:network}
 
+在章节\ref{sec:relatedwork}中展示了一部分针对分布式DAG计算过框架中产生的网络流的优化策略。
+除了纯网络层的优化（比如DCTCP\cite{dctcp}，pFabric\cite{pfabric}，Pias\cite{pias}， CONGA\cite{conga}等）工作以外，有许多研究工作针对类似于shuffle的分布式计算框架特有的网络传输模式，结合应用层的语义对这部分的网络传输做出了优化。
+其中Varys\cite{varys}，Aalo\cite{aalo}，CODA\cite{coda}，Seagull\cite{seagull}都能结合应用层信息提供shuffle在网络传输时的优化，从而加快shuffle的传输过程。
+而这些工作的基础都是基于Coflow\cite{coflow}的API实现的。
+Coflow具体来讲就是在应用层面具有相同目标（比如应用层服务于两个计算阶段数据传输，达到应用层对完成时间限制的目标等）的网络流组的集合。
+其具体API\cite{coflow}如表\ref{tab:coflow}所示。
 
+\begin{table}[!hpb]
+    \centering
+    \bicaption[tab:coflow]{Coflow编程接口列表}{Coflow编程接口列表}{Table}{API list of Coflow}
+    \begin{tabular}{ | m{10cm} | m{5cm} | }
+        \hline
+        Operation & Caller \\ [0.5ex]
+        \hline
+        \hline
+        create$(pattern, [options]) \Rightarrow handle$ & Driver\\ \hline
+        update$(handle, [options]) \Rightarrow result$ & Driver \\ \hline
+        put$(handle, id, content, [options]) \Rightarrow result$ & Sender \\ \hline
+        get$(handle, id, [options]) \Rightarrow content$ & Receiver \\ \hline
+        terminate$(handle, [options]) \Rightarrow result$ & Driver \\ 
+        \hline
+    \end{tabular}
+\end{table}
+
+由于每个coflow都包含了若干的网络流组合，因此它们不能通过简单的流体积来描述。
+要定义coflow，需要知道这个coflow中包含网络流的数量（宽度$width$），其中网络流中最大流的体积（长度$length$），所有流的体积和（$size$），以及每个流的体积分布（倾斜度$skew$）。
+
+对于优化shuffle这个特定过程，在coflow的层面来看就是最小化coflow的平均传输时间（average \textbf{C}oflow \textbf{C}ompletion \textbf{T}ime，average CCT）。
+结合coflow的API列表\ref{tab:coflow}和coflow的这些属性，一个shuffle包含的网络流传输在coflow的优化下需要经过如下步骤：
+\begin{enumerate}
+	\item 通过Driver调用create接口向coflow调度系统注册该shuffle对应的coflow，此时Driver会返回一个与该coflow唯一对应的handle，在具体实现中可以是一个唯一的ID。
+	该ID会通过广播的形式通知各个工作节点。
+	\item 当shuffle中的某个数据块生成完成，对应的工作节点会通过put接口向coflow调度系统放置该流。
+	\item 当shuffle中的某个数据块的接收节点可以开始接收该数据块，比如reduce任务已经启动，会通过get接口向coflow调度系统请求该网络流。
+	\item 当coflow调度系统收到该coflow中某个流的put和get消息之后，就会更新其对应的节点信息和体积信息等，并且标记为该flow已经可以传输。
+	\item 当一个coflow中的所有流都已经被标记为可以传输，coflow调度系统就会根据特定的算法对该coflow进行调度，得出其中每个flow的传输速度，并且开始传输。
+	比较典型的coflow之间的调度算法有最小瓶颈coflow优先（Smallest-Effective-Bottleneck-First）\cite{varys}，而coflow内部的流之间的调度算法有满足最小资源分配算法（Minimum-Allocationfor-
+	Desired-Duration）\cite{varys}等。
+\end{enumerate}
+
+从上述的执行流程中可以看到目前coflow的优化是具有一定滞后性的，即需要等到一个shuffle中所有数据块都已经生成并且可以开始传输，在此基础上才能获取完成的coflow信息（比如$length$，$size$等），然后开始调度。
+因而目前coflow对于shuffle的优化往往也都停留在离线过程，即所有的流信息都是已知的情况下（Varys\cite{varys}，Aalo\cite{aalo}，Seagull\cite{seagull}等）才能取得较好的效果。
+论文CODA\cite{coda}提出了采用机器学习算法和延迟绑定的策略来缓解coflow信息未知对调度带来的滞后性影响，但是在预测过程中仍然存在5\%的错误率，这些错误的存在可能造成流对coflow的从属关系发生错误，进而影响性能。
+
+而本研究提出的SCache正好能为coflow调度系统提供这些缺失的信息。
+对于coflow中每个流的体积，可以通过在map初始阶段对shuffle输出数据分布的预测来获取。
+于此同时，coflow中每个流的源节点和目的节点也可以通过启发式的reduce任务预调度获得。
+因此在map初始阶段，通过结合本研究的优化策略获取的相关信息便可以通过相应的coflow接口提供给coflow调度系统，从而避免了现有系统的滞后性，获得更好的在线调度性能。
+
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../figure/coflow.pdf}
+	\bicaption[fig:coflow]{SCache结合Coflow调度系统的工作示意图}{SCache结合Coflow调度系统的工作示意图}{Fig}{SCache Works with Coflow Scheduling System}
+\end{figure}
+
+图\ref{fig:coflow}展示了SCache结合典型的集中式Coflow调度系统之后，与分布式DAG计算协同完成shuffle的过程示意图。
+其具体工作流程主要由以下步骤组合：
+
+\begin{enumerate}
+	\item SCache在DAG生成阶段获取shuffle的依赖，
+	\item 在map初始阶段，SCache从DAG从节点的任务执行过程中完成的shuffle输出数据进行收集。
+	之后SCache的主节点根据注册的shuffle依赖与收集的shuffle相关数据进行最终shuffle输出数据分布的预测和reduce任务预调度。
+	\item 完成预调度之后，SCache通过create接口向coflow调度系统注册，获取coflow ID。
+	根据此ID，将预测过程中每个shuffle数据块的体积作为该coflow中网络流体积的$size$，map任务执行节点作为流的源节点，预调度的reduce任务执行节点作为目的节点，然后分别调用coflow的put与get接口上传coflow相关的flow信息。
+	\item Coflow调度系统主节点收到这些信息后，对该coflow进行优先级调度，同时对其中的每个网络流进行限速。完成调度后，coflow调度系统中心节点将调度信息发送到从节点。
+	\item 从节点根据接收到的限速信息，在SCache从节点通过本地网卡读取shufffle数据时，对其进行限速。
+	\item SCache从节点将传输完成的shuffle数据通过内存拷贝提供给DAG计算框架的工作节点。
+\end{enumerate}
+
+在以上所有工作步骤中，涉及到coflow相关注册与限速的步骤从原先的5个步骤缩短到3个步骤（步骤3，4，5）。
+因此通过利用SCache提供的精确的应用层信息，可以大大简化目前coflow调度系统的复杂程度，很好的消除了原先coflow调度系统的滞后性。
+更重要的是，SCache提供的信息与coflow调度所需要的信息完美的匹配，能够实现更精确的coflow在线调度，从而进一步优化shuffle在网络传输过程中的开销。
 
