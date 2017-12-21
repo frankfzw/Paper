@@ -24,18 +24,112 @@
 最近几年，更是有大量的分布式计算框架在学术界和工业界得以发表和公开同时也有大量的计算框架被部署到企业的生产环境中，成为大数据生态系统中最重要的一个组件。
 其中应用最广泛的就是Hadoop MapReduce\cite{mapreduce}，Spark\cite{apachespark}和Tez\cite{tez}等。
 
+虽然这些计算框架的设计和实现大相径庭，但是究其本质上对任务进行分布式并行处理的基本理念还是有着许多相似之处。
+本节将首先介绍目前业界应用最广泛的以及学术界最具代表性分布式计算过框架的工作流程。
+之后分析概况和归纳其在执行分布式任务中存在共性的数据交互模式，以此来说明本课题的研究存在普遍意义。
+
+这其中最经典的分布式计算框架便是Hadoop MapReduce\cite{hadoop}。
+其运行过程主要通过有用户指定具体的mapper和reducer来实现分布式并行计算。
+MapReduce对于用户指定的mapper和reducer会在执行过程中创建多个任务副本（Task）。
+这些任务在任务调度器和资源调度器共同的调度下，会被分配到集群中的某个节点上的Java虚拟机（JVM）中进行执行。
+而整个的MapReduce工作就是由这些mapper和reducer以及它们所对应的任务连接起来，行程一个流水线状的执行流程图。
+具体可以参考图\ref{fig:mrdag}
+
 \begin{figure}[!htp]
-	\centering
-	\includegraphics[width=\textwidth]{dagOverview.pdf}
-	\bicaption[fig:dagOverview]{分布式DAG计算框架执行示意图}{分布式DAG计算框架执行示意图}{Fig}{Overview of DAG computing frameworks}
+    \centering
+    \includegraphics[width=0.8\textwidth]{mrdag.pdf}
+	\bicaption[fig:mrdag]{Hadoop MapReduce执行示意图}{Hadoop MapReduce执行示意图}{Fig}{Hadoop MapReduce Execution Pipeline}
 \end{figure}
 
-如图\ref{fig:dagOverview}所示，这些计算框架通过有向无环图（DAG）的方式来表达用户应用逻辑。
+在一个MapReduce工作开始时，其流水线的第一个任务会从分布式存储系统，比如HDFS中读取该工作的一部分数据。
+之后在用户指定的mapper下对这部分数据进行操作，这部分成为map阶段。
+在map阶段任务执行结束后，产生的中间结果会被保存到本地磁盘。
+当所有map阶段的任务都执行完成，Hadoop MapReduce便会启动用户指定的reducer，开始reduce阶段的计算（此处不考虑slow-start）。
+在reduce阶段的每个任务启动时，便会通过shuffle过程从远程节点的磁盘读取map阶段计算产生的中间结果。
+当reduce阶段执行完成之后，产生的最终结果会被保存到分布式存储系统，为工作流水线的下一个步骤提供输入。
+可以看到在经典的MapReduce计算过程中，每个reduce阶段结束之后多需要写入分布式存储系统，而且对于流水线中开始的map任务也存在大量的冗余操作。
+
+Apache Tez\cite{tez}是基于Hadoop的生态系统，在Yarn的基础上\cite{yarn}的分布式DAG计算框架。
+不同于MapReduce，Tez将原先的map和reduce操作拆分成了更细粒度的操作，并且通过顶点（vertex）和边的方式来表示运算的DAG。
+具体执行DAG可以参考\ref{fig:tezdag}。
+其执行DAG中的定点代表了用户定义的运算逻辑，每个顶点中包含了具体的并行执行的运算任务，来实现分布式计算加速。
+而边则表示顶点之间的数据依赖，从数据生产者指向消费者，其中三种比较常见的依赖为“一对一”，“广播”和“分散-聚合”（one-to-one, broadcast, scatter-gather）。
+图\ref{fig:tezdag}中Vertex 1和Vertex 3之间的依赖便是“一对一”依赖，而剩下的则是“分散-聚合”依赖，也就是shuffle依赖。
+在Tez执行DAG的过程中，每个reduce任务将不在进行对分布式存储系统的写入操作，同时也通过复用map任务的部分重复性操作，显著提高了运行效率。
+
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{tezdag.pdf}
+	\bicaption[fig:tezdag]{Apache Tez执行示意图}{Apache Tez执行示意图}{Fig}{Execution DAG of Apache Tez}
+\end{figure}
+
+Spark\cite{spark}的出现和开源（Apache Spark\cite{apachespark}）使分布式并行计算的效率和使用范围得到了进一步的提升。
+在设计过程中，Spark为用户提供了丰富的接口（groupBy，sortByKey等），从而实现了更丰富的计算逻辑表达。
+用户可以通过这些接口来对分布式工作进行编程设计。
+在Spark的核心，用户的计算逻辑通过接口被翻译成了Resilient Distributed Datasets（RDD）之间的转换关系（transformation）。
+连接RDD之间的转换关系最终在执行过程中行程系带（lineage），用来表示各个执行过程中的依赖。
+这些依赖关系最终被调度器优化成DAG，用来表达逻辑层的计算过程。
+
+图\ref{fig:sparkdag}展示了Spark在具体数据层执行过程。
+Spark中的RDD在具体数据层中与计算所需的分布式数据集一一对应。
+在工作执行过程中，Spark采用了延迟绑定的策略。
+其调度器会从用户提交的最后一个RDD开始延系带关系递归向前，当遇到转换关系中存在全部依赖时（wide dependency）便将其作为计算阶段（stage）的分界。
+该递归过程会在寻找到已经计算完成的RDD或者该计算工作的最初始输入时停止。
+对于一个节点上同一个阶段内的所有RDD之间的转换计算，Spark将其统一成一个任务（task），由其负责对该阶段内一个数据分区的所有运算。
+同时，Spark会在执行阶段将RDD所对应的数据块缓存在节点内存中，从而使一个任务的所有转换计算都能在内存中高效得进行。
+当工作执行到存在全部依赖的时候，Spark会通过一次shuffle操作来满足下一个计算阶段的数据依赖。
+
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{sparkdag.pdf}
+	\bicaption[fig:sparkdag]{Spark执行示意图}{Spark执行示意图}{Fig}{Execution DAG of Spark}
+\end{figure}
+
+在学术领域比较有代表性的一个分布式计算框架模型就是Dryad\cite{dryad}。
+Dryad通过Nebula的脚本语言向用户提供接口。
+用户可以通过该脚本语言来构造顶点和变，最终行程一个DAG。
+其中顶点表示具体的某一种计算操作，而每一条边则代表顶点之间的数据依赖模式，具体可以通过本地临时文件，TCP管道或者共享内存来实现。
+临时文件使其实现数据流动的默认方式，在一个顶点的执行结束之后就会在本地生成文件。
+TCP管道和共享内存都可以避免磁盘访问，但是TCP管道需要不同顶点同时运行，而共享内存甚至需要不同顶点在同一个进程里运行。
+
+Dryad框架在获取用户提交的DAG之后，会将DAG划分成多个阶段（stage），每个阶段都包含了一个特定的计算顶点。
+在Dryad执行具体工作时，会对相应的DAG进行运行时的优化。
+比如对其中的多对一的规约节点和一对多的节点进行副本操作，从而增加计算过程的并发度。
+经过优化之后的具体执行流程图如图\ref{fig:dryaddag}所示。
+通过Dryad的运行时优化之后，就会在每个阶段行程多个具有相同执行逻辑的顶点，而在默认采用临时文件进行数据传输时，就会形成典型的shuffle传输。
+
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{dryaddag.pdf}
+	\bicaption[fig:dryaddag]{Dryad执行示意图}{Dryad执行示意图}{Fig}{Execution DAG of Dryad}
+\end{figure}
+
+Pregel\cite{pregel}主要针对于大规模的图计算而设计的图计算引擎。
+其计算逻辑图也由顶点和边构成。
+但是值得注意的是Pregel的计算逻辑图是支持顶点间有环存在的。
+Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
+而其中的有向边则连接了两个顶点，用来进行信息的传递。
+其具体计算步骤则根据整体同步并行计算模型（Bulk Synchronize Parallel，BSP）来控制。
+如图\ref{fig:pregel}所示，Pregel的执行过程由若干个$Supterstep$组成。
+每个$Supterstep$会根据全局的同步信号来进行信息传递。
+计算过程最终会在所有节点的算法都终止时结束。
+在每个$Supterstep$内，执行图中的所有节点都会并发的进行本地的计算。
+图\ref{fig:pregel}中的虚线则代表了节点之间的有向边，即数据依赖。
+当完成一个$Supterstep$之后，每个节点都会根据定义的边向目的节点发送信息，之后进入下一步的计算。
+而在$Supterstep$之间，也需要完成一个多对多的顶点信息传输，也可以用shuffle来表示。
+
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{pregel.pdf}
+	\bicaption[fig:dryaddag]{Pregel执行示意图}{Pregel执行示意图}{Fig}{Execution Model of Pregel}
+\end{figure}
+
+综合对上述这些分布式计算框架的特点研究，我们发现其中都存在一种多对多的网络传输模式，即shuffle。
 在执行DAG的过程中，对于每一个计算阶段（stage）采用了整体同步并行计算模型(BSP)来对大数据进行分布式的并行批处理。
-在一个计算阶段，框架会将数据分块，并且对于每一块数据应用相同的用户定义计算来进行并行处理，既图\ref{fig:dagOverview}中的task。
+在一个计算阶段，框架会将数据分块，并且对于每一块数据应用相同的用户定义计算来进行并行处理
 在DAG的执行过程中，每一个任务都会有对上一个任务的数据依赖。这个数据依赖可以被分成两个类型：完全依赖和部分依赖。
-完全依赖指的是当前计算阶段的一个任务所需要的输入数据完全依赖于上一个计算阶段的一个或几个任务的所有输出数据，比如图\ref{fig:dagOverview}中黑色箭头所表示的依赖关系。
-部分依赖，也就是本文中提到的shuffle，则表示当前计算阶段的一个任务所需要的输入数据依赖于上一个计算阶段的多个任务的部分数据，比如图\ref{fig:dagOverview}中绿色的部分。
+完全依赖指的是当前计算阶段的一个任务所需要的输入数据完全依赖于上一个计算阶段的一个或几个任务的所有输出数据，
+部分依赖，也就是本文中提到的shuffle，则表示当前计算阶段的一个任务所需要的输入数据依赖于上一个计算阶段的多个任务的部分数据。
 通常而言，对于产生shuffle数据的一端，我们称之为映射阶段（Map Stage），而对于接收shuffle数据的一端，我们称之为规约阶段（Reduce Stage）。
 对于完全依赖，目前已经有了好的解决方案。比如Spark\cite{apachespark}中RDD\cite{spark}的解决方案，就通过将连续的完全依赖的计算阶段合并成一个大的计算阶段，并且通过内存计算的加速来优化了这部分数据依赖。
 
