@@ -14,7 +14,9 @@ blue = '#4682B4'
 green = '#2E8B57'
 light_blue = '#87CEFA'
 
-f = open('./cdf')
+# f = open('./cdf')
+f = open('./coflow_cdf')
+x_label = 'Coflow Completion Time (S)'
 
 x = []
 y = []
@@ -39,16 +41,19 @@ fig, ax = plt.subplots(figsize=(6.5,6.5))
 width = 9.5
 
 ax.plot(x, y, linewidth=3, color=blue)
+avg = sum(x) / len(x)
+# ax.axvline(avg, linewidth=3, color='r', ls='--')
 
 # ax.legend(loc=4, fontsize=16, frameon=False)
-ax.set_xlabel('Shuffle Time Fraction', fontsize=22)
+ax.set_xlabel(x_label, fontsize=22)
 ax.set_ylabel('CDF', fontsize=22)
 ax.set_aspect(1. / ax.get_data_ratio())
 ax.grid(True)
 # plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), 
 #         loc=3, ncol=2, mode="expand", borderaxespad=0., 
 #         fontsize=16, frameon=False)
-plt.savefig("reduce_cdf.pdf")
+# plt.savefig("reduce_cdf.pdf")
+plt.savefig("coflow_cdf.pdf")
 # size = fig.get_size_inches()
 # print size
 # 

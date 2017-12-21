@@ -81,7 +81,7 @@ SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息
 递归寻找的过程会在当一个RDD的数据已经被计算或者已经到了存储系统的部分就会停止。
 而这些计算阶段则最终组成了计算过程中的DAG逻辑。
 
-对于DAG中相邻计算阶段之间的shuffle依赖，它们会被打包成一个RPC的调用提交到SCache的从属调度器上。如表\ref{apis}中，一个shuffle依赖需要包含一个唯一的整数ID代表该工作，同时需要包含这个shuffle依赖中每个shuffle的ID，以及它们对应的分区函数的类型，map阶段任务数和reduce阶段的任务数。
+对于DAG中相邻计算阶段之间的shuffle依赖，它们会被打包成一个RPC的调用提交到SCache的从属调度器上。如表\ref{tab:apis}中，一个shuffle依赖需要包含一个唯一的整数ID代表该工作，同时需要包含这个shuffle依赖中每个shuffle的ID，以及它们对应的分区函数的类型，map阶段任务数和reduce阶段的任务数。
 在收到一次RPC提交之后，SCache的从属调度器会首先检查分区函数的类型，如果不是哈希分区函数，就会通过在Spark的Driver上的守护进程在Spark执行该计算阶段前插入一段采样程序。
 我们会在章节\ref{sec:sampling}中详细阐述这个过程。
 
@@ -111,7 +111,7 @@ SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息
 \begin{figure}[!htp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{preschedule.pdf}
-	\bicaption[fig:putblock]{预调度与预取工作时序图}{预调度与预取工作时序图}{Fig}{Sequence Diagram of Pre-scheduling and Pre-fetching}
+	\bicaption[fig:preschedule]{预调度与预取工作时序图}{预调度与预取工作时序图}{Fig}{Sequence Diagram of Pre-scheduling and Pre-fetching}
 \end{figure}
 
 当预调度算法运行结束之后，SCache的主节点会将reduce任务与计算节点的映射关系进行广播。
@@ -136,7 +136,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/sample.pdf}
+	\includegraphics[width=0.6\textwidth]{../../PPoPP-2018/fig/sample.pdf}
 	\bicaption[fig:sample]{对于一个任务数据分区的采样}{对于一个任务数据分区的采样}{Fig}{Reservoir Sampling of One Data Partition}
 \end{figure}
 
@@ -329,7 +329,7 @@ $ScacheBlockObjectWriter$实现了对Spark原来的$DiskBlockObjectWriter$的继
 在插入采样程序部分，我们利用了Spark中$RangePartitioner$在决定分区边界时对RDD进行计算的过程，在其中插入了采样过程。
 为了提高效率，对RDD数据的采样以及分区的计算是在Spark的Driver内部进行。
 计算完成之后再将数据发送给SCache，具体逻辑如代码\ref{code:sample}所示。
-其中返回的$distribution$将会作为采样的分布通过接口\ref{tab:api}中的$sampling$发送个SCache。
+其中返回的$distribution$将会作为采样的分布通过接口\ref{tab:apis}中的$sampling$发送个SCache。
 
 \begin{lstlisting}[style={myScalastyle}, caption={水塘采样代码片段}, label={code:sample}]
     def determineBounds[K : Ordering : ClassTag](
@@ -377,23 +377,140 @@ $ScacheBlockObjectWriter$实现了对Spark原来的$DiskBlockObjectWriter$的继
 
 首先，我们对Hadoop MapReduce的计算过程中存在的shuffle特点进行分析。
 虽然在表达DAG的过程中Hadoop MapReduce与Spark存在较大差异，但是在每个map和reduce的计算阶段之间都会存在一个shuffle的过程却十分接近。
-在执行map任务时，Hadoop MapReduce中的\verb|hadoop/hadoop-mapreduce-project/hadoop-mapreduce-client/.../mapred/MapTask.java|
-会将map任务计算产生的shuffle结果通过\verb|MapOutputClollector|接口写入到本地磁盘进行保存。
-在reduce阶段，每个reduce任务由类\verb|hadoop/hadoop-mapreduce-project/hadoop-mapreduce-client/.../mapred/MapTask.java|来执行。
+在执行map任务时，Hadoop MapReduce中的\verb|MapTask.java|类
+会将map任务计算产生的shuffle结果通过\verb|MapOutputClollector.java|接口写入到本地磁盘进行保存。
+当reduce任务数目不为0时，即该map阶段不是工作的最后一次计算过程时，map任务会调用\verb|NewOutputCollector.java|来写入该阶段的输出键值对。
+在具体执行过程中，其通过实例化一个\verb|collector|来进行写操作，而该\verb|collector|就是一个\verb|MapOutputClollector.java|的具体实现。
+具体代码参考代码片段\ref{code:hadoopmap}
+
+在reduce阶段，每个reduce任务由类\verb|ReduceTask.java|来执行。
 具体来说，每个reduce任务会通过\verb|ShuffleConsumerPlugin|的接口来实现第一阶段的远程shuffle数据拷贝过程。
 在目前的MapReduce中，该接口由类\verb|Shuffle<K, V>|实现了一个多线程的异步远程shuffle数据读取。
+具体可以参考代码片段\ref{code:hadoopreduce}。
+
+\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中Map阶段的shuffle写代码片段}, label={code:hadoopmap}]
+    private <...>
+    void runNewMapper(...) throws IOException, ClassNotFoundException,
+                             InterruptedException {
+        // Skip
+        // get an output object
+        if (job.getNumReduceTasks() == 0) {
+          output = 
+            new NewDirectOutputCollector(taskContext, job, umbilical, reporter);
+        } else {
+          output = new NewOutputCollector(taskContext, job, umbilical, reporter);
+        }
+        // Skip    
+        try {
+          long startTime = System.currentTimeMillis();
+          input.initialize(split, mapperContext);
+          mapper.run(mapperContext);
+          mapPhase.complete();
+          setPhase(TaskStatus.Phase.SORT);
+          statusUpdate(umbilical);
+          input.close();
+          input = null;
+          output.close(mapperContext);
+          output = null;
+        } finally {
+          closeQuietly(input);
+          closeQuietly(output, mapperContext);
+        }
+    }
+
+    NewOutputCollector(...) throws IOException, ClassNotFoundException {
+        @Override
+        public void write(K key, V value) throws IOException, InterruptedException {
+          collector.collect(key, value,
+                            partitioner.getPartition(key, value, partitions));
+        }
+        @Override
+        public void close(TaskAttemptContext context
+                          ) throws IOException,InterruptedException {
+          try {
+            collector.flush();
+          } catch (ClassNotFoundException cnf) {
+            throw new IOException("can't find class ", cnf);
+          }
+          collector.close();
+        }
+    }
+\end{lstlisting}
+
+\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中Reduce阶段的shuffle读代码片段}, label={code:hadoopreduce}]
+    public class ReduceTask extends Task {
+        public void run(...) throws IOException, InterruptedException, ClassNotFoundException {
+          // Skip
+          ShuffleConsumerPlugin.Context shuffleContext = new ShuffleConsumerPlugin.Context(...);
+          shuffleConsumerPlugin.init(shuffleContext);
+          // fetch the remote shuffle blocks simultaneously
+          rIter = shuffleConsumerPlugin.run();
+        }
+    }
+
+    public class Shuffle<K, V> implements ShuffleConsumerPlugin<K, V>, ExceptionReporter {
+        // Skip
+        @Override
+        public RawKeyValueIterator run() throws IOException, InterruptedException {
+          //Skip
+          if (isLocal) {
+            fetchers[0] = new LocalFetcher<K, V>(jobConf, reduceId, scheduler,
+            merger, reporter, metrics, this, reduceTask.getShuffleSecret(),
+            localMapFiles);
+            fetchers[0].start();
+          } else {
+            for (int i=0; i < numFetchers; ++i) {
+              fetchers[i] = new Fetcher<K,V>(...);
+              fetchers[i].start();
+            }
+          }
+        }
+    }
+\end{lstlisting}
+
 而对于任务的调度，在Hadoop MapReduce中，主要由一系列状态机的转移和Yarn的资源调度机制协同完成。
 具体来讲，在一个MapReduce任务被提交之后，经过一系列的状态转移，最终会由\verb|JobImpl|类来完成map和reduce阶段的具体任务生成以及提交。
 而由于MapReduce的计算DAG相较于Spark十分简单，即在一个任务只有Map和Reduce两个过程，所以对于shuffle的相关元数据便可以在此处获得。
+具体关于shuffle两端map和reduce任务的生成，可以参考代码\ref{code:hadoopshuffle}。
+
+\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中shuffle元数据生成代码片段}, label={code:hadoopshuffle}]
+    public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job, EventHandler<JobEvent> {
+        // Skip
+        @Override
+        public JobStateInternal transition(JobImpl job, JobEvent event) {
+          // Skip
+          createMapTasks(job, inputLength, taskSplitMetaInfo);
+          createReduceTasks(job);
+        }
+    }
+\end{lstlisting}
+
 对于reduce阶段的任务预调度，在MapReduce中都是通过\verb|RMContainerAllocator.java|的类来实现的。
+当其收到对reduce任务的调度的请求时，\verb|RMContainerAllocator.java|会根据从Yarn的ResourceManager那里获取的可用容器数（Container）进行分配。
+具体可以参考代码片段\ref{code:hadoopschedule}
+
+\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中reduce任务调度代码片段}, label={code:hadoopschedule}]
+    public class RMContainerAllocator extends RMContainerRequestor implements ContainerAllocator {
+        private ContainerRequest assignToReduce(Container allocated) {
+          ContainerRequest assigned = null;
+          //try to assign to reduces if present
+          if (assigned == null && reduces.size() > 0 && canAssignReduces()) {
+            TaskAttemptId tId = reduces.keySet().iterator().next();
+            assigned = reduces.remove(tId);
+            LOG.info("Assigned to reduce");
+          }
+          return assigned;
+        }
+    }
+\end{lstlisting}
 
 综上所述，我们给出了一下对Hadoop MapReduce的SCache适配的改造方案。
 \begin{enumerate}
-    \item Shuffle元数据获取：在\verb|JobImpl|类中\verb|JobStateInternal transition(JobImpl job, JobEvent event)|函数执行过程中，可以获取shuffle两端对应的map任务个数，reduce任务个数等信息。
+    \item Shuffle元数据获取：在\verb|JobImpl|类中发生任务提交而产生的状态转换函数执行过程中，可以获取shuffle两端对应的map任务个数，reduce任务个数等信息。
     此时，便可以将这些数据通过接口\ref{tab:apis}中的\verb|registerShuffles|进行提交。
     \item Map任务shuffle数据的解耦：可以通过重新实现一个对接口\verb|MapOutputClollector|的实现类来获取shuffle数据，并且通过内存拷贝传递给SCache。
     \item Reduce任务shuffle数据的解耦：可以通过重新实现一个接口\verb|ShuffleConsumerPlugin|的实现类来从SCache的内存缓存获取shuffle的数据。
-    \item Reduce任务的预调度：需要将SCache的预调度结果通过接口在\verb|RMContainerAllocator.java|调度任务前对预调度结果进行获取，然后在其调用\verb|addReduce|函数时遵循预调度的结果即可。
+    \item Reduce任务的预调度：需要将SCache的预调度结果通过接口在\verb|RMContainerAllocator.java|调度任务前对预调度结果进行获取，然后在其调用\verb|assignToReduce|函数时遵循预调度的结果即可。
     \item 采样任务的实现：在\verb|JobImpl|类中生成具体任务的时候，可以通过配置信息来获取分区函数的信息。
     如果发现是一个非哈希的分区函数，则在创建map任务的同时创建每个任务对应的采样任务对其进行数据采样。
 \end{enumerate}

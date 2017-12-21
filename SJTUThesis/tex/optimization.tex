@@ -72,7 +72,7 @@
 
 \begin{figure}[!htp]
     \centering
-	\includegraphics[width=0.5\textwidth]{../../PPoPP-2018/fig/reduce_cdf.pdf}
+	\includegraphics[width=0.6\textwidth]{../../PPoPP-2018/fig/reduce_cdf.pdf}
 	\bicaption[fig:cdf]{OpenCloud日志中shuffle时间占比累积分布}{OpenCloud日志中shuffle时间占比累积分布}{Fig}{Shuffle Time Fraction CDF of OpenCloud Trace}
 \end{figure}
 
@@ -266,6 +266,12 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 	\bicaption[fig:oneshuffle]{单shuffle依赖}{单shuffle依赖}{Fig}{Single Shuffle Dependency}
 \end{figure}
 
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{../figure/twoshuffles.pdf}
+	\bicaption[fig:twoshuffles]{多shuffle依赖}{多shuffle依赖}{Fig}{Multiple Shuffle Dependencies}
+\end{figure}
+
 而为了满足这些复杂逻辑支持，使得在DAG中一个计算阶段对多个shuffle依赖的情况广泛存在。
 如图\ref{fig:twoshuffles}所示，其中展现了一个存在两个shuffle依赖的reduce计算阶段。
 其中的reduce阶段的任务输入数据最终取决于两个map计算阶段的任务都结束后的输出shuffle数据分布。
@@ -275,22 +281,6 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 但是这么做会带来不可忽视的额外开销，比如因为每个阶段map任务的逻辑不同，所以在执行器执行任务过程中，这种同时调度的方式就会带来在JVM中任务额外的序列化开销。
 而目前DAG框架为了减少重复地对任务代码进行序列化，都只采用了一个计算阶段内部任务的并行。
 因此为了防止破坏这些DAG计算框架提供的优化执行方案，我们设计了一种累计的启发式调度算法（算法\ref{mhminheap}）来处理对于多个shuffle依赖的reduce任务预调度。
-
-\begin{figure}[!htp]
-    \centering
-    \includegraphics[width=0.6\textwidth]{../figure/twoshuffles.pdf}
-	\bicaption[fig:twoshuffles]{多shuffle依赖}{多shuffle依赖}{Fig}{Multiple Shuffle Dependencies}
-\end{figure}
-
-具体过程如$M\_SCHEDULE$函数中所描述的。算法会记录经过若干轮的调度之后，当前每个节点所积累的reduce任务数据量，即算法中的$shuffles$变量。
-当一个新的shuffle依赖中的map计算阶段开始执行，$M\_SCHEDULE$就会被调用，并且根据之前调度结果的累计进行新一轮的调度。
-首先算法会先将新一轮的预测shuffle数据分布与之前的累积值进行相加，从而更新每个reduce任务中（$p_reduce$）相应的$prob$值和对应的$host$。
-更新之后便会调用算法\ref{hminheap}中的$SCHEDULE$函数进行新一轮的任务预调度。
-而当新的预调度结果产生之后，算法就能获取一个新的任务--节点的映射关系。
-对于那些任务中新分配的节点（$assigned\_host$）与之前一轮调度中分配的节点不同的任务，算法会触发一次网络重传，将原先已经预取到旧的节点上的数据重新传输到新分配的节点（re-shuffle）。
-Re-shuffle的过程会引入额外的开销，但是由于前阶段的shuffle数据累计使得更新后原节点往往是本地性最好的节点，并且$prob$参数会比较大。
-因此在$SWAP\_TASKS$的时候，新一轮调度的节点仍有可能通过置换被重新调度回原先的节点，从而使在不破坏负载均衡的同时将re-shuffle的开销降到最低。
-
 
 \begin{algorithm}[H]
 	\caption{多shuffle依赖的累计启发式调度}
@@ -321,6 +311,15 @@ Re-shuffle的过程会引入额外的开销，但是由于前阶段的shuffle数
 		\EndProcedure
 	\end{algorithmic}
 \end{algorithm}
+
+具体过程如$M\_SCHEDULE$函数中所描述的。算法会记录经过若干轮的调度之后，当前每个节点所积累的reduce任务数据量，即算法中的$shuffles$变量。
+当一个新的shuffle依赖中的map计算阶段开始执行，$M\_SCHEDULE$就会被调用，并且根据之前调度结果的累计进行新一轮的调度。
+首先算法会先将新一轮的预测shuffle数据分布与之前的累积值进行相加，从而更新每个reduce任务中（$p_reduce$）相应的$prob$值和对应的$host$。
+更新之后便会调用算法\ref{hminheap}中的$SCHEDULE$函数进行新一轮的任务预调度。
+而当新的预调度结果产生之后，算法就能获取一个新的任务--节点的映射关系。
+对于那些任务中新分配的节点（$assigned\_host$）与之前一轮调度中分配的节点不同的任务，算法会触发一次网络重传，将原先已经预取到旧的节点上的数据重新传输到新分配的节点（re-shuffle）。
+Re-shuffle的过程会引入额外的开销，但是由于前阶段的shuffle数据累计使得更新后原节点往往是本地性最好的节点，并且$prob$参数会比较大。
+因此在$SWAP\_TASKS$的时候，新一轮调度的节点仍有可能通过置换被重新调度回原先的节点，从而使在不破坏负载均衡的同时将re-shuffle的开销降到最低。
 
 \section{基于应用上下文的内存管理}
 
@@ -407,8 +406,8 @@ Coflow具体来讲就是在应用层面具有相同目标（比如应用层服�
 	\item 当shuffle中的某个数据块的接收节点可以开始接收该数据块，比如reduce任务已经启动，会通过get接口向coflow调度系统请求该网络流。
 	\item 当coflow调度系统收到该coflow中某个流的put和get消息之后，就会更新其对应的节点信息和体积信息等，并且标记为该flow已经可以传输。
 	\item 当一个coflow中的所有流都已经被标记为可以传输，coflow调度系统就会根据特定的算法对该coflow进行调度，得出其中每个flow的传输速度，并且开始传输。
-	比较典型的coflow之间的调度算法有最小瓶颈coflow优先（Smallest-Effective-Bottleneck-First）\cite{varys}，而coflow内部的流之间的调度算法有满足最小资源分配算法（Minimum-Allocationfor-
-	Desired-Duration）\cite{varys}等。
+	比较典型的coflow之间的调度算法有最小瓶颈coflow优先（Smallest-Effective-Bottleneck-First，SEBF）\cite{varys}，而coflow内部的流之间的调度算法有满足最小资源分配算法（Minimum-Allocation-for-
+	Desired-Duration，MADD）\cite{varys}等。
 \end{enumerate}
 
 从上述的执行流程中可以看到目前coflow的优化是具有一定滞后性的，即需要等到一个shuffle中所有数据块都已经生成并且可以开始传输，在此基础上才能获取完成的coflow信息（比如$length$，$size$等），然后开始调度。
