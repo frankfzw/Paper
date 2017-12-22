@@ -6,29 +6,33 @@
 \begin{abstract}
 
 大数据时代的到来使得分布式计算变得越来越普及。
-为了快速地处理大规模的数据，有大量复杂的计算框架被设计并使用，比如Hadoop MapReduce\cite{mapreduce}，Spark\cite{apachespark}，Dryad\cite{dryad}, Tez\cite{tez}等。
+为了快速地处理大规模的数据，有大量复杂的计算框架被设计并使用，比如Hadoop MapReduce\cite{hadoop}，Spark\cite{apachespark}，Dryad\cite{dryad}, Tez\cite{tez}等。
 这些分布式计算框架大多采用将用户计算逻辑用有向无环图(Directed Acyclic Graph, DAG)的方式呈现出来。
 在执行DAG的过程中，对于每一个阶段这些计算框架大多采用了整体同步并行计算模型(Bulk-Synchronous Parallel, BSP)来对大数据进行分布式的并行批处理。
 
 在这些相邻的计算阶段之间，shuffle，或者说跨网络的多对多分块数据的读写满足了计算逻辑对于不同数据的依赖。于此同时，shuffle的过程也带来了大量的网络数据传输。
-受限于计算对于数据的依赖以及网络磁盘等硬件性能，使得依赖于shuffle的这些任务的性能会因为shuffle的开销而收到巨大损失。
+受限于计算对于数据的依赖以及网络，磁盘等硬件性能，使得依赖于shuffle的这些任务的性能会因为shuffle的开销而受到巨大损失。
 尤其是在一些需要大量的数据shuffle的情境中，比如两张数据库大表的交集，shuffle的开销甚至会成为整个应用的性能瓶颈。
 更重要的是，这个问题在大多数分布式并行DAG计算框架中都普遍存在。
-为了提供一种具有普遍意义的shuffle优化方案，本研究取了这些系统的shuffle设计中存在的一些共性问题：1)粗粒度的资源管理降低了资源的可复用性, 比如使得计算资源在进行I/O操作时长时间闲置。
-2)几乎同步的shuffle读取会给网络带来一个瞬时的流量高峰，从而增加了数据拉取的时间。
 
-针对以上问题，本文提出了S(huffle)Cache，一个开源的即用型系统用来优化DAG计算过程中的shuffle阶段。
-通过在计算阶段真正执行前提取表达计算逻辑的DAG以及其中的shuffle依赖关系，SCache可以采用更细粒度的shuffle管理和内存对数据读写来提高资源的利用率。
-于此同时，SCache通过计算框架外部的shuffle的管理来避免同步的数据传输，减缓了shuffle给网络带来的压力。
-为了实现以上的优化目标，本研究课题：
+为了提供一种具有普遍意义的shuffle优化方案，本研究抽取取了这些系统的shuffle设计中存在的一些共性问题：1)粗粒度的资源管理降低了资源的可复用性, 比如使得计算资源在进行I/O操作时长时间闲置。
+2)同步滞后的shuffle读取不仅增加网络shuffle网络传输显示等待时间，也给网络带来一个瞬时的流量高峰，进一步减慢了网络传输过程。
+
+针对以上问题，本文提出了S(huffle)Cache --- 一个开源的即用型系统用来优化DAG计算过程中的shuffle阶段。
+通过在计算阶段真正执行前提取表达计算逻辑的DAG以及其中的shuffle依赖关系，SCache可以将shuffle过程从DAG计算过程中解耦合，从而提供更细粒度的硬件资源管理，提高资源利用率和复用率。
+于此同时，SCache通过提前异步的shuffle传输来隐藏DAG计算过程中显示的网络等待时间，同时也减缓了shuffle给网络带来的压力。
+为了更好的提升效率，SCache还利用结合应用上下问的内存管理，来实现对shuffle数据的内存缓存，进一步提升shuffle过程的效率。
+为了实现以上的优化目标，本研究做出了以下主要贡献：
 
 \begin{enumerate}
     \item 将shuffle从计算过程中的解耦，使得shuffle的过程独立到外部进行管理，从而实现了更细粒度的硬件资源管理。
     \item 结合应用的上下文对shuffle数据进行预取，既避免了同步数据读取给网络带来的压力，又能将大部分网络传输时间隐藏到计算的阶段。
+    \item 结合应用的上下文对shuffle数据内存管理和内存缓存，进一步提升shuffle过程的效率。
     \item 根据现有的分布式计算框架shuffle的特点设计了相应的接口(API)。通用的接口设计使得优化能被应用到不同的分布式并行计算框架当中。
 \end{enumerate}
 
-本研究课题实现了一个简单的分布式内存数据块管理系统，同时修改了Apache Spark，并且通过仿真实验和Amazon AWS EC2集群上进行了大规模的实验。在不同的数据集和测试程序的测试中，SCache能减少将近89\%的shuffle开销。
+基于以上阐述，本研究课题实现了SCache --- 一个简单的分布式内存shuffle数据块管理系统，同时修改了Apache Spark，并且通过仿真实验和Amazon AWS EC2集群上进行了大规模的实验。
+在不同的数据集和测试程序的测试中，SCache能减少将近89\%的shuffle开销。
 在TPC-DS的测试中，优化能给分布式SQL查询带来平均大约40\%的性能提升。
 
 \keywords{\large 分布式计算框架， Shuffle， 优化}
@@ -37,30 +41,32 @@
 \begin{englishabstract}
 
 Recent years have witnessed widespread use of distributed computing in the big data area.
-Numbers of sophisticated distributed data parallel computing frameworks, such as Hadoop MapReduce\cite{mapreduce}, Spark\cite{spark}, and Dryad\cite{dryad}, 
+Numbers of sophisticated distributed data parallel computing frameworks, such as Hadoop MapReduce\cite{hadoop}, Spark\cite{spark}, Dryad\cite{dryad}, and Tez\cite{tez},
 have been developed and deployed to accelerate the big data processing.
 Most of these frameworks do the computing by transforming the application logic into Directed Acyclic Graph (DAG).
 In order to increase the parallelism, each computing stage is usually managed according to the Bulk-Synchronous Parallel (BSP) model during the execution of DAG.
 
 Shuffle, or the cross-network read and aggregation of partitioned data between tasks with data dependencies among the consecutive execution stages, 
 usually brings in large network transfer. 
-Due to the dependency constrains and the litmited performance of disks and networks, execution of those descendant tasks could be delayed by logy shuffles. 
+Due to the dependency constrains and the litmited performance of disks and networks, execution of those descendant tasks could be delayed by inefficient shuffles. 
 This delay can futher slows down the whole application processs. 
 The performance degradation introduced by shuffle can become overwhelming in the shuffle instensive applications such as a join of two big tables.
 Moreover, the above deficiencies of shuffle generally exist in most of the DAG data parallel computing frameworks. 
 In this paper, we extract the common issues in current shuffle mechanism: 
 1) The coarse granularity resource mamangement decreases the multiplexing of hardware resources. For example, the inefficient management can keep CPU idle while tasks doing I/O operations.
-2）The synchronized shuffle read brings a network burst, which than slows down the shuffle read itself.
+2）The synchronized shuffle read increases the explict network waiting time and brings a network burst which further slows down the shuffle read itself.
 
-Based on the above observations, we present S(huffle)Cache, an open source plug-in system that particularly focuses on shuffle optimization in frameworks defining jobs as DAGs. 
+Based on the above observations, we present S(huffle)Cache --- an open source plug-in system that particularly focuses on shuffle optimization in frameworks defining jobs as DAGs. 
 By extracting and analyzing the DAGs and shuffle dependencies prior to the actual task execution, 
 SCache can take full advantage of the fine granularity resource management and system memory to accelerate the shuffle process. 
-Meanwhile, SCache manages the shuffle data out of the frameworks and transfers data asynchronously, which helps avoid network burst.
+Meanwhile, SCache manages the shuffle data out of the frameworks and transfers data asynchronously, which helps overlap the network transfer time and avoid network burst.
+In addition, SCache provides an application-context-aware in-memory shuffle data management scheme to further accelerate the shuffle process.  
 In order to achieve the optimizations, we make following contributions:
 
 \begin{enumerate}
     \item Decouple the shuffles and manage them out of the DAG data parallel computing frameworks so that the shuffle data management can become more efficient.
     \item Implement the shuffle data pre-fetch with application context so that the network burst can be avoided and the network transfer time can be hidden in execution phases.
+    \item Implement the application-context-aware in-memory shuffle data management to accelerate the shuffle process.
     \item Design and implement the general APIs for the DAG data parallel computing frameworks so that the optimizations can be applied easily.
 \end{enumerate}
 

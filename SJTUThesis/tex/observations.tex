@@ -6,9 +6,9 @@
 \chapter{Shuffle特点观察}
 \label{chap:observations}
 
-本章首先分析了shuffle在目前分布式DAG计算框架中的特性，然后通过对其特征的研究，结合DAG计算过框架的特性，探索其优化的方向。
+本章首先分析了shuffle在目前分布式DAG计算框架中的特性，然后通过对其特征的研究，结合分布式DAG计算框架的特性，探索其优化的方向。
 
-\section{shuffle的特点}
+\section{Shuffle的特点}
 在分布式并行DAG计算框架中，shuffle被用来实现一个在计算过程中任务的多对多数据依赖。
 同时也代表了一次计算集群内部节点多对多的网络数据传输。
 为了便于理解，本文用map阶段来代表产生shuffle数据的DAG计算阶段，用reduce阶段代表获取shuffle数据作为输入的计算阶段。
