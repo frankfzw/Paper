@@ -111,7 +111,8 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 	t = k \times x \quad (k = 1, 2, 3, ...)
 \end{equation}
 比如Hadoop MapReduce的手册\cite{hadooptutorial}建议每个节点运行10-100个map任务（即等式\ref{eq:multi}中 $k \in [10, 100]$）。
-同时该手册还建议运行时将任务的并发度调整到$0.95$ 或 $1.75 \times$ 节点数 $\times$ 每个节点的最大容器数。
+同时该手册还建议运行时将任务的并发度调整到“$0.95$ 或 $1.75 \times$ 节点数 $\times$ 每个节点的最大容器数”
+。
 Spark的配置手册\cite{sparkconf}也建议为节点上的每个CPU分配2-3个任务（即等式\ref{eq:multi}中 $k = 2, 3$）。
 
 对于shuffle数据而言，当每一个map任务运行结束时，该任务所产生的shuffle数据就能被完整的获取。
