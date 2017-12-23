@@ -157,6 +157,12 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 采样结束后，map阶段的本地计算任务就会被启动，用来对采样数据进行计算和分区，最终可以获得该map任务对于下阶段$reduce_i$产生的数据量，也就是$sample_i$。
 当每个节点完成本地的采样之后，这些数据会被汇总到中心调度器上进行汇总，而每个map任务对应的数据块体积大小则被作为权重来获得最终的预测分布。
 
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{locality.pdf}
+	\bicaption[fig:locality]{Reduce任务负载均衡调度中的数据本地性}{Reduce任务负载均衡调度中的数据本地性}{Fig}{The Data Locality in Reduce Tasks Load Balancing Scheduling}
+\end{figure}
+
 在图\ref{fig:range_pre_sample}中，我们将$s$设置为3。
 可以看到相较于线性回归模型，采样预测的精度即使在数据极端倾斜的场景中也能获得比较不错的结果。
 需要注意的是，图中采样预测的分布曲线与最终真是数据的分布曲线在标准化之后并不是完美的匹配的。
@@ -170,7 +176,6 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 虽然采样预测能够提供非常好的精确性，但是由于需要在本地对小部分数据进行map阶段的任务计算，因此也会带来额外开销。
 为了避免这种额外开销，采样预测只有在一些容易产生数据倾斜的分区函数时才会被触发，比如范围分区函数，用户自定义的分区函数等。
 对于采样预测带来的开销，我们将在章节\ref{chap:evaluation}中做出详细的测试。
-
 在对shuffle的数据做出预测的同时，考虑到数据本地行的特征，我们还会对每个reduce任务的输入数据中的所有数据来源做一个计算，并算出该数据块中来源最高的数据块的占比。
 即：
 \begin{equation}
@@ -189,7 +194,10 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 这些近似算法已经被证明至少不会差于最优解的2倍。
 但是如果考虑到本地性，使得任务完成时间仅仅依靠数据大小这个关联被打破。
 因为存在两种负载相同的调度，由于本地性的不同使得网络数据传输量不同，那么对于数据传输量较大的方案，即本地性较差的调度方案，其任务完成时间受到网络传输延迟的影响的可能性就更大。
-这使得本身就是NP难的调度问题就会变得更加复杂。
+比如图\ref{fig:locality}中，两个节点在reduce阶段分别需要运行一个体积为3的reduce任务，图中（a）和（b）的调度方案最终A，B节点的负载都是一致的。
+但是如果不考虑数据本地性，即如\ref{fig:locality}（a）中的调度方案，那么网络中需要传输的shuffle数据体积便是4。
+而如果考虑到数据本地性，那么最优的调度方案应如图\ref{fig:locality}中（b）所示。
+图\ref{fig:locality}在保证reduce阶段各个节点负载均衡的情况下使得shuffle的传输量下降到了2。
 
 \begin{figure}[!htp]
     \centering
@@ -197,6 +205,7 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 	\bicaption[fig:twoshuffles]{多shuffle依赖}{多shuffle依赖}{Fig}{Multiple Shuffle Dependencies}
 \end{figure}
 
+考虑数据本地性可以获得更好的调度结果，但也使得本身就是NP难的负载均衡调度问题变得更加复杂。
 为了解决这个问题，我们提出了一个综合考虑本地性以及负载均衡的启发式算法来针对单个shuffle依赖的reduce阶段的任务进行预调度（Heuristic MinHeap算法\ref{hminheap}）。
 对单个shuffle依赖的启发式调度算法主要可以分为两轮的调度。
 在第一轮调度中（即算法\ref{hminheap}中的第一个while循环），算法首先根据对reduce任务数据体积的预测结果将其进行按体积降序排序。
@@ -205,7 +214,7 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 在第二轮的调度中，算法会根据数据本地性这个属性来对第一轮已经完成的任务--节点映射关系做出调整。
 算法中的$SWAP\_TASK$函数只有在任务当前分配的节点（算法中$assign\_id$）的与数据本地性最好的节点（算法中的$host\_id$）不匹配时才会被触发。
 对于一个shuffle数据最多有$prob$比例来自于$host$的reduce任务，算法通过标准化计算出了$norm$作为该任务可以用来用来换取数据本地性的性能开销极大值。
-通过这个标准化计算使得任务在用牺牲系能换取更好的本地性的同时，不会让性能的损失超过原先该reduce计算阶段的10\%。
+这个标准化计算使得任务在用牺牲系能换取更好的本地性的同时，不会让性能的损失超过原先该reduce计算阶段的10\%。
 
 通过启发式的任务本地性交换策略，使得该算法在保证负载均衡的同时获取一个相对较好的本地性，从而尽可能避免引入额外的网络shuffle数据传输。
 即使相较于Spark原生的FIFO调度策略\cite{sparksource}，本算法在负载和数据本地性上都能获得更优的效果。
@@ -213,6 +222,22 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 如图\ref{fig:sim}中“Heuristic MinHeap”的曲线所示，本算法可以获得相较于Spark原生算法更好的性能提升。
 相较于Spark调度算法平均2.7\%的性能提升，算法\ref{hminheap}平均可以获得5.7\%的性能提升。
 这个更均匀的负载与更好的本地性也是在基于应用上下文的情况下对shuffle数据做出预测后的调度所获得的一个附加的优势。
+
+\subsection{处理多shuffle的依赖}
+
+在目前大数据应用日益复杂的前提下，分布式DAG计算框架也相应的提供了更复杂的计算逻辑支持。
+而为了满足这些复杂逻辑支持，使得在DAG中一个计算阶段对多个shuffle依赖的情况广泛存在。
+
+如图\ref{fig:twoshuffles}所示，其中展现了一个存在两个shuffle依赖的reduce计算阶段。
+在单个shuffle依赖的情况下，只需要在map阶段的前期对shuffle数据进行预测即可做出reduce阶段的任务预调度与shuffle数据预取。
+但是对于依赖多个shuffle的reduce阶段，其任务输入数据最终取决于所有shuffle依赖对应的map计算阶段的任务结束后的输出数据分布。
+在小结\ref{subsec:schedule}中提到的方法只能解决对于单个正在执行的shuffle的数据预测与相应的任务预调度。
+在多个shuffle依赖的情境中，对于没有被执行的那些shuffle依赖，因为还不存在map任务的部分执行结果，也没办法对其进行采样，因而不能对这些shuffle的数据做出预测。
+其中一种解决这个困境的方案就是让分布式DAG计算框架对所有shuffle依赖的全部map阶段任务进行同时调度。
+但是这么做不仅会破坏原先各个分布式DAG计算过框架的设计，也会带来不可忽视的额外开销。
+比如因为每个阶段map任务的逻辑不同，所以在执行器执行任务过程中，这种同时调度的方式就会带来在JVM中任务额外的序列化开销。
+而目前DAG框架为了减少重复地对任务代码进行序列化，大都只采用了一个计算阶段内部任务的并行。
+因此为了防止破坏这些DAG计算框架提供的优化执行方案，我们设计了一种累积的启发式调度算法（算法\ref{mhminheap}）来处理对于多个shuffle依赖的reduce任务预调度。
 
 \begin{algorithm}[H]
 \caption{单个shuffle依赖的启发式调度}
@@ -266,21 +291,23 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 	\end{algorithmic}
 \end{algorithm}
 
-\subsection{处理多shuffle的依赖}
+具体过程如$M\_SCHEDULE$函数中所描述的。算法会记录经过若干轮的调度之后，当前每个节点所积累的reduce任务数据量，即算法中的$shuffles$变量。
+当一个新的shuffle依赖中的map计算阶段开始执行，$M\_SCHEDULE$就会被调用，并且根据之前调度结果的累计进行新一轮的调度。
+首先算法会先将新一轮的预测shuffle数据分布与之前的累积值进行相加，从而更新每个reduce任务中（$p\_reduce$）相应的$prob$值和对应的$host$。
+更新之后便会调用算法\ref{hminheap}中的$SCHEDULE$函数进行新一轮的任务预调度。
+而当新的预调度结果产生之后，算法就能获取一个新的任务 --- 节点的映射关系。
+对于那些任务中新分配的节点（$assigned\_host$）与之前一轮调度中分配的节点不同的任务，算法会触发一次网络重传，将原先已经预取到旧的节点上的数据重新传输到新分配的节点（re-shuffle）。
+Re-shuffle的过程会引入额外的开销，但是由于之前若干shuffle数据预取的累积，使得相应的$prob$值也就越大，因而算法在$SWAP\_TASK$的本地性挑中中更倾向于原节点。
+因此，在累积调度过程中，算法\ref{mhminheap}不仅能保证多shuffle依赖下对reduce数据的预测，同时也能在保证负载均衡和本地性的的同时将re-shuffle的开销尽可能地降低。
 
-在目前大数据应用日益复杂的前提下，分布式DAG计算框架也相应的提供了更复杂的计算逻辑支持。
-而为了满足这些复杂逻辑支持，使得在DAG中一个计算阶段对多个shuffle依赖的情况广泛存在。
+\section{基于应用上下文的内存管理}
 
-如图\ref{fig:twoshuffles}所示，其中展现了一个存在两个shuffle依赖的reduce计算阶段。
-在单个shuffle依赖的情况下，只需要在map阶段的前期对shuffle数据进行预测即可做出reduce阶段的任务预调度与shuffle数据预取。
-但是对于依赖多个shuffle的reduce阶段，其任务输入数据最终取决于所有shuffle依赖对应的map计算阶段的任务结束后的输出数据分布。
-在小结\ref{subsec:schedule}中提到的方法只能解决对于单个正在执行的shuffle的数据预测与相应的任务预调度。
-在多个shuffle依赖的情境中，对于没有被执行的那些shuffle依赖，因为还不存在map任务的部分执行结果，也没办法对其进行采样，因而不能对这些shuffle的数据做出预测。
-其中一种解决这个困境的方案就是让分布式DAG计算框架对所有shuffle依赖的全部map阶段任务进行同时调度。
-但是这么做不仅会破坏原先各个分布式DAG计算过框架的设计，也会带来不可忽视的额外开销。
-比如因为每个阶段map任务的逻辑不同，所以在执行器执行任务过程中，这种同时调度的方式就会带来在JVM中任务额外的序列化开销。
-而目前DAG框架为了减少重复地对任务代码进行序列化，大都只采用了一个计算阶段内部任务的并行。
-因此为了防止破坏这些DAG计算框架提供的优化执行方案，我们设计了一种累积的启发式调度算法（算法\ref{mhminheap}）来处理对于多个shuffle依赖的reduce任务预调度。
+在章节\ref{chap:observations}中提到了关于shuffle数据体积的观察。
+虽然shuffle数据相较于应用的输入数据体积较小，而且当前用于计算的内存也日益增大，但是我们仍然需要对shuffle数据在内存中的缓存进行精细的管理，防止其过多占用内存而影响DAG计算框架的执行性能。
+
+为了缓存数据，SCache首先需要在节点内存中占用一部分内存作为存储shuffle的专用内存空间。
+当其中缓存的shuffle数据超过占用的内存体积时，需要将一部分数据先保存到硬盘上，并且在这部分数据被使用之前重新将他们放入内存中。
+为了实现内存缓存对性能提升的最大化，我们在这里结合了分布式DAG计算框架调度任务的特点，提出了两条管理shuffle内存的规则：全部或者没有（all-or-noting）和基于上下文的优先级。
 
 \begin{algorithm}[H]
 	\caption{多shuffle依赖的累积启发式调度}
@@ -311,24 +338,6 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 		\EndProcedure
 	\end{algorithmic}
 \end{algorithm}
-
-具体过程如$M\_SCHEDULE$函数中所描述的。算法会记录经过若干轮的调度之后，当前每个节点所积累的reduce任务数据量，即算法中的$shuffles$变量。
-当一个新的shuffle依赖中的map计算阶段开始执行，$M\_SCHEDULE$就会被调用，并且根据之前调度结果的累计进行新一轮的调度。
-首先算法会先将新一轮的预测shuffle数据分布与之前的累积值进行相加，从而更新每个reduce任务中（$p\_reduce$）相应的$prob$值和对应的$host$。
-更新之后便会调用算法\ref{hminheap}中的$SCHEDULE$函数进行新一轮的任务预调度。
-而当新的预调度结果产生之后，算法就能获取一个新的任务 --- 节点的映射关系。
-对于那些任务中新分配的节点（$assigned\_host$）与之前一轮调度中分配的节点不同的任务，算法会触发一次网络重传，将原先已经预取到旧的节点上的数据重新传输到新分配的节点（re-shuffle）。
-Re-shuffle的过程会引入额外的开销，但是由于之前若干shuffle数据预取的累积，使得相应的$prob$值也就越大，因而算法在$SWAP\_TASK$的本地性挑中中更倾向于原节点。
-因此，在累积调度过程中，算法\ref{mhminheap}不仅能保证多shuffle依赖下对reduce数据的预测，同时也能在保证负载均衡和本地性的的同时将re-shuffle的开销尽可能地降低。
-
-\section{基于应用上下文的内存管理}
-
-在章节\ref{chap:observations}中提到了关于shuffle数据体积的观察。
-虽然shuffle数据相较于应用的输入数据体积较小，而且当前用于计算的内存也日益增大，但是我们仍然需要对shuffle数据在内存中的缓存进行精细的管理，防止其过多占用内存而影响DAG计算框架的执行性能。
-
-为了缓存数据，SCache首先需要在节点内存中占用一部分内存作为存储shuffle的专用内存空间。
-当其中缓存的shuffle数据超过占用的内存体积时，需要将一部分数据先保存到硬盘上，并且在这部分数据被使用之前重新将他们放入内存中。
-为了实现内存缓存对性能提升的最大化，我们在这里结合了分布式DAG计算框架调度任务的特点，提出了两条管理shuffle内存的规则：全部或者没有（all-or-noting）和基于上下文的优先级。
 
 \subsection{全部或没有规则}
 
@@ -398,6 +407,12 @@ Coflow指的是在应用层面具有相同目标（比如服务于应用层两�
 由于每个coflow都包含了若干的网络流组合，因此它们不能通过简单的流体积来描述。
 要定义一个coflow，需要知道这个coflow中包含网络流的数量（宽度$width$），其中包含的网络流中最大流的体积（长度$length$），所有包含的网络流的体积和（$size$），以及网络流的体积分布（倾斜度$skew$）。
 
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{../figure/coflow.pdf}
+	\bicaption[fig:coflow]{SCache结合Coflow调度系统的工作示意图}{SCache结合Coflow调度系统的工作示意图}{Fig}{SCache Works with Coflow Scheduling System}
+\end{figure}
+
 对于优化shuffle网络传输这个特定过程，在coflow的层面来看就是最小化coflow的平均传输时间（average \textbf{C}oflow \textbf{C}ompletion \textbf{T}ime，average CCT）。
 结合coflow的API列表\ref{tab:coflow}和coflow的这些属性，一个shuffle对应的网络流传输在coflow的优化下需要经过如下步骤：
 \begin{enumerate}
@@ -419,12 +434,6 @@ Coflow指的是在应用层面具有相同目标（比如服务于应用层两�
 对于coflow中每个流的体积，可以通过在map初始阶段对shuffle输出数据分布的预测来获取。
 于此同时，coflow中每个流的源节点和目的节点也可以通过启发式的reduce任务预调度获得。
 因此在map初始阶段，通过结合本研究的优化策略获取的相关信息便可以通过相应的coflow接口提供给coflow调度系统，从而避免了现有系统的滞后性，获得更好的在线调度性能。
-
-\begin{figure}[!htp]
-    \centering
-    \includegraphics[width=0.9\textwidth]{../figure/coflow.pdf}
-	\bicaption[fig:coflow]{SCache结合Coflow调度系统的工作示意图}{SCache结合Coflow调度系统的工作示意图}{Fig}{SCache Works with Coflow Scheduling System}
-\end{figure}
 
 图\ref{fig:coflow}展示了SCache结合典型的集中式coflow调度系统之后，与分布式DAG计算协同完成shuffle的过程示意图。
 其具体工作流程主要由以下步骤组合：

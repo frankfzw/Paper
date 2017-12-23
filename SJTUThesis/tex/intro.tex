@@ -127,7 +127,7 @@ Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
 \begin{figure}[!htp]
     \centering
     \includegraphics[width=0.8\textwidth]{pregel.pdf}
-	\bicaption[fig:dryaddag]{Pregel执行示意图}{Pregel执行示意图}{Fig}{Execution Model of Pregel}
+	\bicaption[fig:pregel]{Pregel执行示意图}{Pregel执行示意图}{Fig}{Execution Model of Pregel}
 \end{figure}
 
 综合对上述这些分布式计算框架的特点研究，我们发现虽然这些分布式计算框架的上层设计大相径庭，但是它们进行分布式任务执行的过程是十分相似的。
@@ -141,6 +141,12 @@ Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
 	\item 为了满足不同计算阶段之间，不同任务的数据依赖，这些计算框架都设计了不同方式的数据传输，而其中涉及到多对多的数据依赖时，其大都采用了本地磁盘缓存加网络传输的方式来进行实现。 
 \end{enumerate}
 
+\begin{figure}[!htp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{narrowdep.pdf}
+	\bicaption[fig:narrowdep]{完全依赖}{完全依赖}{Fig}{Full Dependency}
+\end{figure}
+
 总结归纳这些共同点，我们认为对于大部分分布式计算框架，其执行任务的本质就是在一个与计算逻辑有着对应关系的DAG中进行数据的处理和传输的过程。
 其执行过程从数据流动的方向看，可以认为是被BSP模型的同步屏障显示的划分成的多个计算阶段的组合。
 而在每个计算阶段的内部，从数据分块的方向看，每一个计算阶段在执行时同时存在若干并行的任务，在集群不同的节点上对每个数据块进行计算。
@@ -148,18 +154,12 @@ Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
 这些数据依赖模式从DAG顶点与有向边对应关系的角度，可以分为“一对一”，“一对多”，“多对一”和“多对多”。
 而从计算任务本身对数据的依赖角度，我们可以将这种对应关系更精简的分为两类：完全依赖和部分依赖。
 
-图\ref{fig:narrowdp}中（a）和（b）均表示是完全依赖，即当前计算阶段中一个任务所需要的输入数据完全依赖于上一个计算阶段的一个或几个任务的所有输出数据。
+图\ref{fig:narrowdep}中（a）和（b）均表示是完全依赖，即当前计算阶段中一个任务所需要的输入数据完全依赖于上一个计算阶段的一个或几个任务的所有输出数据。
 反应在DAG执行图中边的形态，就是“一对一”或者“多对一”的情况。
 对于完全依赖，由于一个任务依赖于是上一计算阶段任务输出的若干个完整的数据块，从而可以避免该任务对上一阶段剩余部分数据块计算结果的依赖，因此比较容易优化，而且目前业界已经有了比较成熟的方案。
 比如Spark通过利用数据的完全依赖性，将DAG计算过程中连续的完全依赖打包成一个计算阶段（stage）。
 同时，对于完全依赖中的每一个完整的数据块的运算过程打包成一个任务（task）。
 在调度任务的过程中，通过内存缓存机制使DAG中完全依赖的这部分计算过程在本地节点的内存中连续进行，从而实现加速DAG执行过程。
-
-\begin{figure}[!htp]
-    \centering
-    \includegraphics[width=0.8\textwidth]{narrowdep.pdf}
-	\bicaption[fig:narrowdep]{完全依赖}{完全依赖}{Fig}{Full Dependency}
-\end{figure}
 
 部分依赖则表示当前计算阶段的一个任务所需要的输入数据依赖于上一个计算阶段的多个任务的部分数据，如图\ref{fig:widedep}所示。
 反应在DAG执行图中，则可以是“一对多”或者“多对多”的形态，其中“多对多”本质上则是多个“一对多”的组合。
@@ -167,7 +167,7 @@ Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
 
 \begin{figure}[!htp]
     \centering
-    \includegraphics[width=0.5\textwidth]{widedep.pdf}
+    \includegraphics[width=0.4\textwidth]{widedep.pdf}
 	\bicaption[fig:widedep]{部分依赖}{部分依赖}{Fig}{Partial Dependency}
 \end{figure}
 
