@@ -53,8 +53,8 @@ This delay can further slows down the whole application process.
 The performance degradation introduced by shuffle can become overwhelming in the shuffle intensive applications such as a join of two big tables.
 Moreover, the above deficiencies of shuffle generally exist in most of the DAG data parallel computing frameworks. 
 In this paper, we extract the common issues in current shuffle mechanism: 
-1) The coarse granularity resource mamangement decreases the multiplexing of hardware resources. For example, the inefficient management can keep CPU idle while tasks doing I/O operations.
-2）The synchronized shuffle read increases the explict network waiting time and brings a network burst which further slows down the shuffle read itself.
+1) The coarse granularity resource management decreases the multiplexing of hardware resources. For example, the inefficient management can keep CPU idle while tasks doing I/O operations.
+2）The synchronized shuffle read increases the explicit network waiting time and brings a network burst which further slows down the shuffle read itself.
 
 Based on the above observations, we present S(huffle)Cache --- an open source plug-in system that particularly focuses on shuffle optimization in frameworks defining jobs as DAGs. 
 By extracting and analyzing the DAGs and shuffle dependencies prior to the actual task execution, 
