@@ -32,11 +32,11 @@ SCache的主节点中包含了DAG附属调度器，并且通过DAG附属调度�
 并且对于未完成的map任务，一旦工作节点通过内存拷贝的方式获取了相应的shuffle数据后就立即广播给集群中的各个节点，以便其开始shuffle的预取。
 除此之外，SCache主节点还会根据任务的执行顺序信息给各个shuffle的数据单元标注上优先级并且发送给各个工作节点。
 
-SCache的从节点会在本地占用一部分内存空间用来存储shuffle的数据块。
+SCache的工作节点会在本地占用一部分内存空间用来存储shuffle的数据块。
 为了减少内存管理的开销，SCache使用了Java虚拟机的堆外内存来对shuffle的数据块进行存储。
 采用这种方式，既可以减少序列化反序列化带来的计算资源开销，同时又减轻了Java虚拟机垃圾回收算法（Garbage Collection）中的计算复杂度，有利于提升系统的整体性能。
 
-于此同时，当本地的内存空间不够时，各个工作节点会根据从主节点收到的shuffle数据块优先级信息，结合本地的缓存信息（比如是否存在不完整的shuffle存储单元）来将一部分shuffle数据先保存到磁盘上。
+与此同时，当本地的内存空间不够时，各个工作节点会根据从主节点收到的shuffle数据块优先级信息，结合本地的缓存信息（比如是否存在不完整的shuffle存储单元）来将一部分shuffle数据先保存到磁盘上。
 本地的工作节点会在内存中至少缓存一个优先级最高的reduce任务需要的shuffle数据块。
 当本地工作节点的shuffle缓存数据被任务消耗时，该部分内存空间就会被释放，而在磁盘中缓存的较高优先级的数据就会被立刻放入内存中。
 通过结合主节点的优先级信息，本地shuffle的缓存状况以及Spark任务对shuffle数据的访问状况，工作节点的调度可以保证相对独立的完成内存管理并且保证：（1）shuffle数据可以在reduce任务开始执行前就被缓存在内存当中并且（2）shuffle数据的内存缓存不会破坏全部或没有以及应用优先级的限制。
@@ -99,7 +99,7 @@ DAG附属调度器会根据以上信息采用相应的线性回归算法或者�
 对于一个哈希分区函数的map任务，当计算结束之后分区函数会将计算产生的键值对通过相应的哈希函数划分成不同的数据块。
 对于每一个数据块，SCache在Spark系统中的daemon程序都会根据其所在的工作ID对应的shuffle依赖ID，map任务ID，和reduce任务ID对每个数据块进行一个唯一的编号（即表格\ref{tab:apis}中的blockId）。
 在此之后daemon程序会首先通过RPC的方式将这些shuffle数据块的元数据发送给SCache本地节点的工作进程。
-于此同时，daemon进程也会通过Java对象的序列化的方式，将相应的数据序列化成字节码。
+与此同时，daemon进程也会通过Java对象的序列化的方式，将相应的数据序列化成字节码。
 当接受到元数据之后，SCache的本地进程就会通过内存拷贝的形式，将序列化之后的字节码数据从Spark执行器的Java虚拟机的内存空间通过daemon程序拷贝到外部SCache的内存空间。
 一旦内存拷贝结束，该map任务所占用的计算资源（slot）就会被立即释放。
 通过SCache此处的内存拷贝优化，使得原先阻塞的磁盘I/O操作被避免，从而实现了map任务端更细粒度的硬件资源管理，提高了硬件资源的利用率和复用率。
@@ -154,7 +154,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 同时，SCache的工作节点会定期向主节点发送心跳信息，一旦主节点没有收到其中一个工作节点的心跳，就可以通过远程脚本控制其在本地重启。
 当工作节点重启之后，主节点会向其发送当前shuffle的调度状态，工作节点则会根据本地磁盘的shuffle数据块备份状况和当前的shuffle状态来判断是否有未完成的shuffle数据块预取以及缓存任务。
 而在工作节点进程失效的过程中，Spark的执行器如果有相应的reduce任务执行需要数据，则会被其中的守护进程阻塞住，直到本地工作进程完成重启。
-对于SCache主节点的容错性，由于主节点的进程只服务与一个Spark的driver程序，并且不需要调度对于跨工作的shuffle数据依赖，因此主节点采用了简单的本地磁盘备份日志的方式来备份当前对于相关shuffle的元数据记录和调度记录等信息。
+对于SCache主节点的容错性，由于主节点的进程只服务与一个Spark的Driver程序，并且不需要调度对于跨工作的shuffle数据依赖，因此主节点采用了简单的本地磁盘备份日志的方式来备份当前对于相关shuffle的元数据记录和调度记录等信息。
 
 为了降低系统复杂度，SCache在设计的过程中并未引入应对节点崩溃下线的容错机制。
 省略这部分机制的原因主要有一下几点：
@@ -180,14 +180,14 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 \label{sec:impl}
 
 为了验证本研究方案的普适性，本章将详细展示在工程方面改造Spark的开销。
-同时也将展示在Hadoop上的可行性分析。
+同时也将展示在Hadoop MapReduce上的可行性分析。
 通过以上两个方面的分析和探索，最终可以证明SCache提供的优化方案可以在不需要大量改造成本的情况下即可适配目前主流的分布式DAG框架。
 
 \subsection{Spark的实现分析}
 本次实现中，我们利用Spark这个被广泛应用的分布式DAG计算平台来对SCache的优化进行适配。
 在Spark上的修改主要集中在以下几个方面。
 
-首先，我们通过netty\cite{netty}的库在Spark内部实现了一个守护进程 --- \verb|ScacheDaemon|。
+首先，我们通过netty\cite{netty}的RPC库在Spark内部实现了一个守护进程 --- \verb|ScacheDaemon|。
 在\verb|ScacheDaemon|中，我们实现了表格\ref{tab:apis}中的相应接口，具体代码片段如代码\ref{code:daemon}所示。
 其中变量\verb|daemon|是SCache在本地的工作进程，可以通过读取配置文件来获取具体端口，来建立连接，\verb|daemon|本身是一个netty的RPC参考（Reference）实例。
 实现中的所有接口都会通过\verb|daemon|这个RPC的参考实例与本地的工作进程和SCache主节点进行数据交互。
@@ -269,7 +269,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 
 同时，为了使Spark的执行器在执行map任务时能够将数据发送给SCache，我们实现了一个\verb|ScacheBlockObjectWriter|用来完成map任务的shuffle数据内存拷贝。
 \verb|ScacheBlockObjectWriter|实现了对Spark原来的\verb|DiskBlockObjectWriter|的继承，并且重载了其中的方法。
-代码\ref{code:writer}展示了\verb|ScacheBlockObjectWriter|在继承过程中比较重要的几个方法重载。
+代码\ref{code:writer}展示了\verb|ScacheBlockObjectWriter|在继承过程中对比较重要的几个方法实现了重载。
 在这里去掉了原先的磁盘写操作，取代的是对内存缓存空间的数据写入以及内存拷贝，从而优化了map计算任务的磁盘阻塞。
 
 \begin{lstlisting}[style={myScalastyle}, caption={ScacheBlockObjectWriter代码片段}, label={code:writer}]

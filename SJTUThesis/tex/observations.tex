@@ -8,7 +8,7 @@
 
 本章首先分析了shuffle在目前分布式DAG计算框架中的特性，然后通过对其特征的研究，结合分布式DAG计算框架的特性，探索其优化的方向。
 
-\section{Shuffle的特点}
+\section{Shuffle特性}
 在分布式DAG计算框架中，shuffle被用来实现一个在计算过程中任务的多对多的部分数据依赖。
 同时也代表了一次计算集群内部节点多对多的网络数据传输。
 为了便于理解，本文用map阶段来代表产生shuffle数据的DAG计算阶段，用reduce阶段代表获取shuffle数据作为输入的计算阶段。
@@ -40,7 +40,7 @@
 	Frameworks and Frameworks with SCache}
 \end{figure}
 
-\section{对shuffle的观察}
+\section{基于shuffle特性的分析}
 
 为了满足计算逻辑中的部分依赖，shuffle这个过程在分布式DAG的计算过程中是无法避免的。
 但是我们能否通过改进shuffle的过程来减少其对计算框架性能的影响呢？
@@ -116,7 +116,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 Spark的配置手册\cite{sparkconf}也建议为节点上的每个CPU分配2-3个任务（即等式\ref{eq:multi}中 $k = 2, 3$）。
 
 对于shuffle数据而言，当每一个map任务运行结束时，该任务所产生的shuffle数据就能被完整的获取。
-于此同时，结合图\ref{fig:util}，可以观察到在任务执行过程中，网络一直处于闲置状态。
+与此同时，结合图\ref{fig:util}，可以观察到在任务执行过程中，网络一直处于闲置状态。
 因此在多轮任务执行的应用环境当中，如果shuffle传输的目的节点已知，那么shuffle数据便可以在map阶段的执行过程中进行预取。
 这种多轮任务的属性则可以很好的将shuffle数据传输过程进行重叠，进而消除目前存在与reduce任务执行过程中的显示shuffle网络传输等待时间。
 
@@ -126,7 +126,7 @@ Spark的配置手册\cite{sparkconf}也建议为节点上的每个CPU分配2-3�
 基于上述优化目标，我们提出了SCache --- 针对分布式DAG计算框架shuffle过程的优化系统。
 在图\ref{fig:workflow}的下半部分展现了DAG计算框架与SCache协同工作时的工作流程。
 在“shuffle write”阶段，SCache通过内存拷贝的方式讲数据直接从任务的内存空间拷贝到预留的shuffle数据存储内存区域。
-于此同时，磁盘的写操作将被省略。而由分布式DAG计算框架分配的slot资源也会在内存拷贝结束之后被立即释放。
+与此同时，磁盘的写操作将被省略。而由分布式DAG计算框架分配的slot资源也会在内存拷贝结束之后被立即释放。
 这些缓存在内存中的shuffle数据会在SCache完成对reduce任务的预调度之后立刻进行网络传输。
 这种数据预取方式既能将“shuffle read”阶段的时间很好的隐藏在map任务执行的过程中，又能避免传统BSP模型下，分布式DAG计算框架统一调度和执行reduce任务带来的同步瞬时大量的网络吞吐。
 
