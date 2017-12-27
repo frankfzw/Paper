@@ -35,7 +35,7 @@
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=\textwidth]{../../PPoPP-2018/fig/workflow.pdf}
+	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/workflow.pdf}
 	\bicaption[fig:workflow]{传统分布式DAG计算框架工作流程与在SCache协同下工作流程的比较}{传统分布式DAG计算框架工作流程与在SCache协同下工作流程的比较}{Fig}{Workflow Comparison between Legacy DAG Computing
 	Frameworks and Frameworks with SCache}
 \end{figure}
@@ -52,7 +52,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 “shuffle write”阶段表示从第一个任务shuffle数据块被写入开始到最后一个任务的最后一个数据块写入结束的时间，
 “shuffle read and execution”则表示从第一个reduce任务开始获取shuffle数据并执行到所有reduce任务执行结束的时间。
 
-从单节点的硬件资源率用率和任务执行的时间分布，结合剩余节点采集的数据，我们发现以下一些问题。
+从单节点的硬件资源利用率和任务执行的时间分布，结合剩余节点采集的数据，我们发现以下一些问题。
 
 \begin{figure}[!htp]
 	\centering
@@ -69,7 +69,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 而在图\ref{fig:util}中，可以看到shuffle数据的写入和shuffle数据的读取都是I/O密集型操作，在这两个阶段，slot中的CPU利用率很低。
 反过来，在进行计算的过程中，节点上的I/O资源则被大量闲置。
 由此可知，在目前以Spark为代表的分布式DAG计算框架分配的任务的不同阶段对硬件资源的需求是不一致的。
-但是当前这种主流的粗粒度资源分配方式为了满足任务在不同阶段的需求，只能舍弃一部分硬件资源的率用率。
+但是当前这种主流的粗粒度资源分配方式为了满足任务在不同阶段的需求，只能舍弃一部分硬件资源的利用率。
 因此要改变这种资源分配与需求的不匹配，必须提供一种更细粒度的资源分配机制。
 
 \subsection{同步滞后的shuffle读取}
@@ -96,7 +96,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 比如Spark Terasort\cite{spark-tera}中，shuffle数据只占到了输入数据的25\%不到。
 在一些研究中\cite{makingsense}的数据也表明，shuffle数据大约只占到了输入数据的10\% $\sim$ 20\%。
 从另一个角度来看，目前出现了越来越多的基于内存的分布式存储系统，比如memcached\cite{memcached}，Tachyon\cite{tachyon}（现在的Alluxio\cite{alluxio}）以及RAMCloud\cite{ramcloud}等。
-这个趋势间接表面了在目前的数据中心环境下，内存资源是足够用来存放这些数据的。
+这个趋势间接表明了在目前的数据中心环境下，内存资源是足够用来存放这些数据的。
 
 退一步说，即使受限于内存体积，使得对shuffle数据的磁盘写操作不可避免，我们认为通过结合应用上下文的shuffle内存数据管理仍然可以很好的隐藏磁盘操作的开销。
 由于DAG的存在，结合调度算法可以很容易就获取任务的调度顺序。
@@ -109,7 +109,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 即对于一个有$s$个计算slot的计算集群而言，每个计算阶段的并行任务$t$：
 \begin{equation}
 	\label{eq:multi}
-	t = k \times x \quad (k = 1, 2, 3, ...)
+	t = k \times s \quad (k = 1, 2, 3, ...)
 \end{equation}
 比如Hadoop MapReduce的手册\cite{hadooptutorial}建议每个节点运行10-100个map任务（即等式\ref{eq:multi}中 $k \in [10, 100]$）。
 同时该手册还建议运行时将任务的并发度调整到“$0.95$ 或 $1.75 \times$ 节点数 $\times$ 每个节点的最大容器数”。
@@ -125,7 +125,7 @@ Spark的配置手册\cite{sparkconf}也建议为节点上的每个CPU分配2-3�
 具体来讲，就是通过解耦合的方式移除阻塞式的I/O操作，然后利用多轮任务执行的特性对shuffle数据进行预取，同时通过内存数据缓存和网络传输过程中的优化来进一步加速shuffle的读写。
 基于上述优化目标，我们提出了SCache --- 针对分布式DAG计算框架shuffle过程的优化系统。
 在图\ref{fig:workflow}的下半部分展现了DAG计算框架与SCache协同工作时的工作流程。
-在“shuffle write”阶段，SCache通过内存拷贝的方式讲数据直接从任务的内存空间拷贝到预留的shuffle数据存储内存区域。
+在“shuffle write”阶段，SCache通过内存拷贝的方式将数据直接从任务的内存空间拷贝到预留的shuffle数据存储内存区域。
 与此同时，磁盘的写操作将被省略。而由分布式DAG计算框架分配的slot资源也会在内存拷贝结束之后被立即释放。
 这些缓存在内存中的shuffle数据会在SCache完成对reduce任务的预调度之后立刻进行网络传输。
 这种数据预取方式既能将“shuffle read”阶段的时间很好的隐藏在map任务执行的过程中，又能避免传统BSP模型下，分布式DAG计算框架统一调度和执行reduce任务带来的同步瞬时大量的网络吞吐。

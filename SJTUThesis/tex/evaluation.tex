@@ -18,7 +18,7 @@
 最后，我们通过模拟的方式对shuffle网络传输过程的进一步优化策略进行测试。
 
 
-简短来讲，在SCache的帮助下，可以减少Spark计算过程中89\%的shuffle时间开销。
+总结来说，SCache的优化可以减少Spark计算过程中89\%的shuffle时间开销。
 同时，在单shuffle的DAG程序中，SCache可以帮助Spark实现在reduce阶段75\%的性能提升。
 对于Terasort的reduce阶段，在SCache的帮助下可以实现50\%的性能提升。
 并且通过启发式预调度算法，相较于Spark调度所产生的经过网络的shuffle数据体积，SCache的优化在加快reduce阶段执行的同时并不会引入额外的网络负载。
@@ -61,7 +61,7 @@
 在图\ref{fig:scache_util}中展示了在SCache优化下执行该单shuffle依赖的程序时的硬件资源使用情况。
 需要注意的是在SCache的优化下，使得整个工作的执行时间缩短了50\%，因此图\ref{fig:scache_util}中横坐标代表的时间长度只有图\ref{fig:util}的一半。
 首先可以看到的就是在图\ref{fig:scache_util}中出现了CPU资源利用率峰值和磁盘，网络这些硬件资源利用率峰值的重合。
-这个表明了通过SCache对shuffle的解耦以及预取，使得节点中硬件资源的利用率和复用率得到了很大的提升。
+这表明了通过SCache对shuffle的解耦以及预取，使得节点中硬件资源的利用率和复用率得到了很大的提升。
 在更细粒度的硬件资源管理下，SCache避免了在原先Spark中因为I/O的操作而无效的占用计算资源的情况。
 同时，由于CPU的资源能被更及时地释放，进而减少了计算资源空置，提高了整个集群在计算过程CPU的利用率。
 以上这些硬件资源利用率上的增加和复用率的增加从资源管理效率的角度证明了在SCache的帮助下，Spark的任务能够被更高效的执行，从而获得更好的性能。
@@ -77,8 +77,8 @@
 如图\ref{fig:groupbymapstage}所示，可以看到在map阶段，随着输入数据的体积增加，SCache通过解耦合的方式提前释放CPU资源，同时通过内存拷贝的方式省略磁盘操作。
 两者结合，能给map阶段的性能带来一个较为显著的提升。
 SCache的优化在map阶段平均可以带来约10\%的性能提升。
-而图\ref{fig:groupbyreducestage}展示了shuffle数据预取对于需要大量shuffle数据传输的应用，能在reduce阶段带来非常显著的性能提升。
-这些提升正是因为SCache通过在map阶段对reduce任务实行预调度和shuffle数据的预取，提前了原先Spark模式中shuffle开始的时间，有效的将网络传输时间隐藏在map计算阶段，从而减少了reduce计算阶段启动之后显式的shuffle等待时间，加快了reduce阶段的任务执行。
+而图\ref{fig:groupbyreducestage}展示了shuffle数据预取对于需要大量shuffle数据传输的应用，能在reduce阶段带来显著的性能提升。
+这些提升正是因为SCache通过在map阶段对reduce任务实行预调度和shuffle数据的预取，提前了原先Spark模式中shuffle开始的时间，有效地将网络传输时间隐藏在map计算阶段，从而减少了reduce计算阶段启动之后显式的shuffle等待时间，加快了reduce阶段的任务执行。
 对于reduce阶段，SCache带来的性能提升较为显著，平均可以达到大约75\%。
 两者相结合，在对单shuffle依赖的工作的优化过程中，SCache可以减少大约89\%的平均shuffle时间开销。
 
@@ -101,10 +101,10 @@ SCache的优化在map阶段平均可以带来约10\%的性能提升。
 之所以SCache的内存拷贝没有完全消除map计算任务中的shuffle写开销是因为在内存拷贝时，首先需要从Spark执行器的Java虚拟机中将shuffle数据移出。
 而shuffle数据在Java虚拟机内存内部则是以Java类对象保存的，因此在将其移出内存空间时需要使用序列化的方法将类对象转换成字节码数组。
 此处序列化的过程仍然会占用CPU的计算资源和时间\cite{makingsense}，并且是不可避免的，因此在图\ref{fig:groupbymaptask}中仍然能观测到shuffle写过程的时间开销。
-所以通过对于任务的细粒度分析，也应证了图\ref{fig:groupbymapstage}中，在map阶段SCache解耦shuffle写的过程并没有带来如reduce阶段那么多的收益。
+所以通过对于任务的细粒度分析，也证明了图\ref{fig:groupbymapstage}中，在map阶段SCache解耦shuffle写的过程并没有带来如reduce阶段那么多的提升。
 
 结合图\ref{fig:groupbyreducetask}，可以观察到在Spark中，相较于map阶段shuffle写的时间开销，reduce阶段计算任务中shuffle读的开销占到整个任务执行时间的比例更大。
-根据我们的实验检测，发现该工作的reduce任务中，shuffle读取过程占到了reduce阶段计算任务的约50\%。
+根据我们的实验检测，发现该工作的reduce任务中，shuffle读取过程约占reduce阶段计算任务总时间的50\%。
 而这其中的大部分延迟是由网络传输带来的。
 SCache通过在map计算阶段的早期对shuffle数据进行了预取，因此当reduce计算被Spark调度并且开始执行之前，通常情况下只有map计算阶段最后一轮的最后完成的几个任务产生的shuffle数据。
 而这部分传输时间由于reduce任务调度的开销以及reduce任务代码序列化等开销，也能被很好的隐藏起来。
@@ -129,7 +129,7 @@ SCache通过在map计算阶段的早期对shuffle数据进行了预取，因此�
 
 除此之外，在借助启发式算法的reduce任务预调度之后，SCache相较于Spark默认的FIFO算法，在负载均衡上有更好的表现。
 在Spark默认的FIFO调度算法下，任务调度器会维护一个调度队列来保存当前仍未被执行的计算任务。
-当调度器检测到有计算节点存在计算资源时，就会按照任务ID有小到大一次将任务分配给计算节点。
+当调度器检测到有计算节点存在计算资源时，就会按照任务ID有小到大依次将任务分配给计算节点。
 而默认情况下，一个CPU核心对应了一个slot执行槽，那么这种调度方式很可能会在初始阶段将几个计算量比较大的任务分配到同一个物理节点上，造成该节点的负载过大。
 之所以会出现这种情况，是因为Spark默认调度算法并没有把每个任务需要的输入数据体积作为调度的一个参数进行考虑。
 而在SCache的启发式算法中，因为调度时通过任务需要的输入体积来估计任务负载，从而将计算量较大的任务均匀分配到了集群的各个节点上，因此相较于Spark默认调度算法能获得更好的负载均衡。
@@ -174,14 +174,14 @@ Terasort最初作为一个针对MapReduce集群性能测试的测试程序，目
 	\bicaption[fig:tera]{Terasort第一个shuffle中reduce阶段的完成时间}{Terasort第一个shuffle中reduce阶段的完成时间}{Fig}{Reduce Stage Completion Time of First Shuffle in Terasort}
 \end{figure}
 
-图\ref{fig:tera_shuffle}则展示了Terasort中第二个shuffle过程中，SCache与原生Spark分别产生的网络流量。
+图\ref{fig:tera_shuffle}则展示了Terasort的第二个shuffle过程中，SCache与原生Spark分别产生的网络流量。
 通过网络的传输数据比较，可以直接反映出在reduce任务调度过程中是否实现了较好的本地性。
 如前文所述，该shuffle所产生的数据分布是一个具有极强本地性倾斜的数据。
-因此在最优的调度决策下，是将某个reduce任务调度到改任务所需输入数据含量最高的一个节点，从而将通过网络的shuffle传输数据降到最低。
+因此在最优的调度决策下，是将某个reduce任务调度到该任务所需输入数据含量最高的一个节点，从而将通过网络的shuffle传输数据降到最低。
 Spark在进行该轮调度的时候，通过读取RDD每个数据分区的数据本地性依赖来寻找输入数据含量最高的节点，从而将该数据分区所对应的reduce任务调度到对应的节点上，以获得最小的网络数据传输量。
 相对的，SCache则是在map计算阶段通过数据采样的方式来预测shuffle数据的分布，进而预测reduce任务的输入。
 在考虑负载均衡的同时，采用启发式的任务置换方式来获取较好的本地性。
-在图\ref{fig:tera_shuffle}中可以看出在Terasort的第二个shuffle过程中，SCache的预调度与预取策略产生的网络流量几乎与Spark延迟调度后获得的最有效果一致。
+在图\ref{fig:tera_shuffle}中可以看出在Terasort的第二个shuffle过程中，SCache的预调度与预取策略产生的网络流量几乎与Spark延迟调度后获得的最优效果一致。
 这个实验证明了即使在shuffle数据具有极强的本地性倾斜时，SCache也能通过采样，任务预调度与shuffle预取来获得几乎同样的最优调度结果。
 
 \begin{figure}[!htp]
@@ -201,7 +201,7 @@ Spark在进行该轮调度的时候，通过读取RDD每个数据分区的数据
 为了测试SCache对shuffle的优化在真实的生产环境中不同负载情况下的优化性能，我们同样也测试了用于评价分布式数据库检索的标准测试程序TPC-DS\cite{tpcds}。
 TPC-DS是一个为数据块查询和数据维持提供通用的模型的测试程序。
 它能够在指定的系统环境和配置下，提供对单一用户数据块查询时间的测试，以及多用户模式下，比如ad-hoc，交互式在线分析查询（OLAP），数据挖掘等的查询吞吐的测试。
-TPC-DS测试程序通常被业界用来评测大数据系统性能的标准测试程序。
+TPC-DS测试程序是业界用来评测大数据系统性能的标准测试程序之一。
 整个TPC-DS测试程序包含了99个不同的数据块查询测试。
 由于在Spark 1.6.2上的SQL兼容性问题，使得其中有部分查询不能被正确执行。
 所以我们选择了其中一部分可兼容的查询进行测试比较，来观察SCache的shuffle优化效果。
@@ -210,7 +210,7 @@ TPC-DS测试程序通常被业界用来评测大数据系统性能的标准测�
 图\ref{fig:tpcds}展示了原生Spark与在SCache优化下的Spark在执行各个查询的总体时间开销比较。
 其中横坐标表示了TPC-DS中的查询测试程序名称，纵坐标则表示每个查询的完成时间。
 可以看到由于shuffle在运行中占用了大量的时间开销，使得经过SCache优化后的Spark能获得极大的性能优化。
-几乎图中所有的测试，在SCache优化下都能取得显著得提升。
+几乎图中所有的测试，在SCache优化下都能取得显著提升。
 更重要的是，在一些查询测试中，比如q8，q88，q72等，在经过SCache对shuffle的优化后，可以获得将近指数级的性能优化。
 其根本原因是在这些查询中的大量的“union”，“groupby”等SQL语句在Spark上都会通过shuffle的形式来满足这些数据依赖。
 比如图\ref{fig:tpcds}中提升效果最显著的q8，其具体查询代码如代码\ref{code:tpcq8}所示\cite{sparktpcds}：
@@ -246,10 +246,10 @@ TPC-DS测试程序通常被业界用来评测大数据系统性能的标准测�
     order by s_store_name LIMIT 100
 \end{lstlisting}
 
-可以看到在TPC-DS的q8查询中存在这对大量数据的\verb|INTERSECT|，\verb|gourpby|，\verb|orderby|等操作，这些操作的背后都会存在大量的shuffle，因此在这个测试中，SCache通过对shuffle的优化使Spark在端到端的工作完成时间上获得了巨大的提升。
+可以看到在TPC-DS的q8查询中存在对大量数据的\verb|INTERSECT|，\verb|groupby|，\verb|orderby|等操作，这些操作的背后都会存在大量的shuffle，因此在这个测试中，SCache通过对shuffle的优化使Spark在端到端的工作完成时间上获得了巨大的提升。
 
 平均各个查询的完成时间，经过SCache的优化可以使TPC-DS这些查询获得平均40\%的完成时间上的提升。
-在TPC-DS上的实验证明即使对于在真是生产环境中的端到端的任务完成时间，SCache对于shuffle的优化仍让是非常有前景的。
+在TPC-DS上的实验证明即使对于在真实生产环境中的端到端的任务完成时间，SCache对于shuffle的优化仍然是非常有前景的。
 
 \section{采样的开销}
 
@@ -258,7 +258,7 @@ TPC-DS测试程序通常被业界用来评测大数据系统性能的标准测�
 其中为了保证系统的可扩展性，采样的开销相对于集群体积的变化规律更为重要。
 因为如果采样的开销会随着集群中节点数量增加而增加的话，即使这种关系是线性的，那么也将极大的影响到SCache的可扩展性。
 虽然系统在设计时采用了主从节点的传统集中式控制模式，但是由于中心节点的负载相对较低，且其所管理的shuffle相关元数据量仅局限于一个DAG应用的运行时间范围，甚至是一个shuffle的时间内，因此其中心节点的负载很难成为整个集群扩展的瓶颈。
-因此采样的开销是否会限制SCache的可扩展性将成文本次测试的重点。
+综上所述，采样的开销是否会限制SCache的可扩展性将成文本次测试的重点。
 
 \begin{figure}[!htp]
 	\centering
@@ -274,10 +274,10 @@ TPC-DS测试程序通常被业界用来评测大数据系统性能的标准测�
 所幸是采样开销的绝对值相对较低，并不会给整个DAG应用的执行带来很大影响。
 
 而图\ref{fig:sampling}中实线线条所展示的则是在相同的每个节点输入数据体积下，随着集群中节点数量的增加，采样开销的变化。
-可以看到除了在除了在每个节点输入数据体积为0.4GB的情况下，采样开销随着集群中节点数增加有两次的上升以外，在其他体积下，采样数并没有随着集群节点数的增加而上升。
+可以看到除了在每个节点输入数据体积为0.4GB的情况下，采样开销随着集群中节点数增加有两次的上升以外，在其他体积下，采样数并没有随着集群节点数的增加而上升。
 基本上可以断定采样的开销在集群中节点数目的变化的维度是相对稳定的。
 此处采样开销的稳定主要得益于中心节点对于每个节点采样数据的收集相对简单。
-首先中心节点收集单节点的数据量是固定的，只包含了采样后的输出数据分布和改输入的体积，这些数据并不受节点的输入数据体积影响。
+首先中心节点收集单节点的数据量是固定的，只包含了采样后的输出数据分布和对应的输入数据体积值，这些数据并不受节点的输入数据体积影响。
 与此同时，由于单节点所需上传的数据较少，因此对于网络传输也不会带来过高的负载。
 而对于中心节点在基于上述收集数据的计算，我们也考虑到预测算法与预调度算法的复杂性，尽可能的用时间复杂度较低的算法来完成预测和任务预调度。
 综上所述，采样过程的开销在集群节点数的维度上能保持相对稳定，而实验结果也很好的证明了在设计过程中的优化措施，使得中心节点不会成为影响整个集群可扩展性的瓶颈。
@@ -310,7 +310,7 @@ Smallest-Effective-Bottleneck-First（SEBF）和Minimum-Allocation-for-Desired-D
 \begin{equation}
     average CCT = \frac{6 + 6}{2} = 6。
 \end{equation}
-而在SEBF的策略中，coflow 1的长度为3，而coflow 2的长度为4，因此coflow 1将优先传输。
+而在SEBF的策略中，如图\ref{fig:coflowsebf}所示，coflow 1的长度为3，而coflow 2的长度为4，因此coflow 1将优先传输。
 与此同时，MADD算法会将coflow 1中其他两个体积较小流的完成时间延长到与其长度3一致。
 因此让出来的部分带宽资源，供coflow 2传输使用。
 在这种调度策略下，coflow 1的完成时间是3，而coflow 2的完成时间是6。
@@ -322,7 +322,7 @@ Smallest-Effective-Bottleneck-First（SEBF）和Minimum-Allocation-for-Desired-D
 \begin{figure}[!htp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{coflowsebf.pdf}
-	\bicaption[fig:coflowfair]{SEBF和MADD的网络调度策略}{SEBF和MADD的网络调度策略}{Fig}{SEBF with MADD Network Scheduling}
+	\bicaption[fig:coflowsebf]{SEBF和MADD的网络调度策略}{SEBF和MADD的网络调度策略}{Fig}{SEBF with MADD Network Scheduling}
 \end{figure}
 
 除了应用这两个算法对shuffle对应的coflow的优先级进行优先级调度和速度限制之外，我们还考虑了链路带宽的不稳定对限速精确性带来的影响。

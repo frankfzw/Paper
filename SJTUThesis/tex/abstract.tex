@@ -25,7 +25,7 @@
 为了实现以上的优化目标，本研究做出了以下主要贡献：
 
 \begin{enumerate}
-    \item 将shuffle过程从计算过程中的解耦，使得shuffle过程独立到外部进行管理，从而实现了更细粒度的硬件资源管理。
+    \item 将shuffle过程从计算过程中解耦，使得shuffle过程独立到外部进行管理，从而实现了更细粒度的硬件资源管理。
     \item 结合应用的上下文对shuffle数据进行预取，既避免了同步数据读取给网络带来的压力，又能将大部分网络传输时间隐藏到计算阶段。
     \item 结合应用的上下文对shuffle数据内存管理和内存缓存，进一步提升shuffle过程的效率。
     \item 根据现有的分布式计算框架shuffle的特点设计了相应的接口(API)。通用的接口设计使得优化能被应用到不同的分布式并行计算框架当中。
@@ -42,7 +42,7 @@
 \begin{englishabstract}
 
 Recent years have witnessed the widespread use of distributed computing in the big data area.
-Numbers of sophisticated distributed data parallel computing frameworks, such as Hadoop MapReduce\cite{hadoop}, Spark\cite{spark}, Dryad\cite{dryad}, and Tez\cite{tez},
+Numbers of sophisticated distributed data parallel computing frameworks, such as Hadoop MapReduce\cite{hadoop}, Spark\cite{apachespark}, Dryad\cite{dryad}, and Tez\cite{tez},
 have been developed and deployed to accelerate the big data processing.
 Most of these frameworks do the computing by transforming the application logic into Directed Acyclic Graph (DAG).
 In order to increase the parallelism, each computing stage is usually managed according to the Bulk-Synchronous Parallel (BSP) model during the execution of DAG.
