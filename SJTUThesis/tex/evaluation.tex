@@ -78,7 +78,7 @@
 两者结合，能给map阶段的性能带来一个较为显著的提升。
 SCache的优化在map阶段平均可以带来约10\%的性能提升。
 而图\ref{fig:groupbyreducestage}展示了shuffle数据预取对于需要大量shuffle数据传输的应用，能在reduce阶段带来非常显著的性能提升。
-这些提升正是因为SCache通过在map阶段对reduce任务实行预调度和shuffle数据的预取，提前了原先Spark模式中shuffle开始的时间，有效的将网络传输时间隐藏在map计算阶段，从而减少了reduce计算阶段启动之后显示的shuffle等待时间，加快了reduce阶段的任务执行。
+这些提升正是因为SCache通过在map阶段对reduce任务实行预调度和shuffle数据的预取，提前了原先Spark模式中shuffle开始的时间，有效的将网络传输时间隐藏在map计算阶段，从而减少了reduce计算阶段启动之后显式的shuffle等待时间，加快了reduce阶段的任务执行。
 对于reduce阶段，SCache带来的性能提升较为显著，平均可以达到大约75\%。
 两者相结合，在对单shuffle依赖的工作的优化过程中，SCache可以减少大约89\%的平均shuffle时间开销。
 

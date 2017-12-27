@@ -68,7 +68,7 @@
 
 \begin{figure}[!htp]
     \centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/sim.pdf}
+	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/sim.pdf}
 	\bicaption[fig:sim]{基于OpenCloud日志的计算阶段完成时间提升}{基于OpenCloud日志的计算阶段完成时间提升}{Fig}{Stage Completion Time Improvement of OpenCloud Trace}
 \end{figure}
 
@@ -235,13 +235,13 @@ $BlockSize_{ji}$代表了这个数据块是由第$j$个map任务产生，属于�
 在小结\ref{subsec:schedule}中提到的方法只能解决对于单个正在执行的shuffle的数据预测与相应的任务预调度。
 在多个shuffle依赖的情境中，对于没有被执行的那些shuffle依赖，因为还不存在map任务的部分执行结果，也没办法对其进行采样，因而不能对这些shuffle的数据做出预测。
 其中一种解决这个困境的方案就是让分布式DAG计算框架对所有shuffle依赖的全部map阶段任务进行同时调度。
-但是这么做不仅会破坏原先各个分布式DAG计算过框架的设计，也会带来不可忽视的额外开销。
+但是这么做不仅会破坏原先各个分布式DAG计算框架的设计，也会带来不可忽视的额外开销。
 比如因为每个阶段map任务的逻辑不同，所以在执行器执行任务过程中，这种同时调度的方式就会带来在JVM中任务额外的序列化开销。
 而目前DAG框架为了减少重复地对任务代码进行序列化，大都只采用了一个计算阶段内部任务的并行。
 因此为了防止破坏这些DAG计算框架提供的优化执行方案，我们设计了一种累积的启发式调度算法（算法\ref{mhminheap}）来处理对于多个shuffle依赖的reduce任务预调度。
 
 \begin{algorithm}[H]
-\caption{单个shuffle依赖的启发式调度}
+\caption{单shuffle依赖的启发式调度}
 \label{hminheap}
 	\begin{algorithmic}[1]
 	\small
@@ -379,7 +379,7 @@ Re-shuffle的过程会引入额外的开销，但是由于之前若干shuffle数
 \section{网络层的进一步优化}
 \label{sec:network}
 
-在章节\ref{sec:relatedwork}中展示了一部分针对分布式DAG计算过框架中产生的网络流的优化策略。
+在章节\ref{sec:relatedwork}中展示了一部分针对分布式DAG计算框架中产生的网络流的优化策略。
 除了纯网络层的优化（比如DCTCP\cite{dctcp}，pFabric\cite{pfabric}，Pias\cite{pias}， CONGA\cite{conga}等）工作以外，有许多研究工作针对类似于shuffle的分布式计算框架特有的网络传输模式，结合应用层的语义对这部分的网络传输做出了优化。
 其中Varys\cite{varys}，Aalo\cite{aalo}，CODA\cite{coda}，Seagull\cite{seagull}都能结合应用层信息提供shuffle在网络传输时的优化，从而加快shuffle的传输过程。
 而这些工作的基础都是基于Coflow\cite{coflow}的编程接口（API）实现的。
