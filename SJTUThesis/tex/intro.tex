@@ -29,7 +29,7 @@
 虽然这些计算框架的设计和实现大相径庭，但是究其本质上对任务进行分布式并行处理的基本理念还是有着许多相似之处。
 
 本节余下部分将首先介绍目前业界应用最广泛的以及学术界最具代表性分布式计算框架的工作流程。
-之后分析概况和归纳其在执行分布式任务中存在的共性，以此来说明本课题的研究存在普遍意义。
+之后分析和归纳其在执行分布式任务中存在的共性，以此来说明本课题的研究存在普遍意义。
 
 这些分布式计算框架中最经典的分布式计算框架便是Hadoop MapReduce\cite{hadoop}。
 Hadoop MapReduce是根据Google发表的MapReduce\cite{mapreduce}论文修改并且开源而来。
@@ -45,7 +45,7 @@ Hadoop MapReduce是根据Google发表的MapReduce\cite{mapreduce}论文修改并
 	\bicaption[fig:mrdag]{Hadoop MapReduce执行示意图}{Hadoop MapReduce执行示意图}{Fig}{Hadoop MapReduce Execution Pipeline}
 \end{figure}
 
-在一个MapReduce应用开始时，其流水线的第一个任务会从分布式存储系统，比如HDFS中读取属于该任务的一部分数据。
+在一个MapReduce应用开始时，其流水线的第一个任务会从分布式存储系统，比如Hadoop分布式文件系统（HDFS）中读取属于该任务的一部分数据。
 之后在用户定义的mapper下对这部分数据进行操作，这部分称为map阶段。
 在map阶段任务执行结束后，产生的中间结果会被保存到本地磁盘。
 在map阶段所有任务执行结束之后，Hadoop MapReduce便会启动用户定义的reducer，开始reduce阶段的计算（此处不考虑slow-start）。
@@ -56,8 +56,9 @@ Hadoop MapReduce是根据Google发表的MapReduce\cite{mapreduce}论文修改并
 Apache Tez\cite{tez}也是基于Hadoop的生态系统，在Yarn的基础上\cite{yarn}实现的分布式计算框架。
 不同于MapReduce，Tez将原先的map和reduce操作拆分成了更细粒度的操作，并且通过顶点（vertex）和边（edge）的方式来表示运算逻辑，即DAG。
 具体执行DAG可以参考图\ref{fig:tezdag}。
-在Tez的DAG中，顶点代表了用户定义的运算逻辑，每个顶点中包含了具体的并行执行的运算任务，来实现分布式计算加速。
-而边则表示顶点之间的数据依赖，从数据生产者指向消费者，其中三种比较常见的依赖为“一对一”，“广播”和“分散-聚合”（one-to-one, broadcast, scatter-gather）。
+在Tez的DAG中，顶点代表了用户定义的运算逻辑，每个顶点中包含了具体的并行执行的运算任务，以此来实现分布式计算加速。
+而边则表示顶点之间的数据依赖，从数据生产者指向消费者。
+其中三种比较常见的依赖为“一对一”，“广播”和“分散-聚合”（one-to-one, broadcast, scatter-gather）。
 图\ref{fig:tezdag}中Vertex 1和Vertex 3之间的依赖便是“一对一”依赖，而剩下的则是“分散-聚合”依赖，也就是shuffle依赖。
 在Tez执行DAG的过程中，每个reduce任务将不再进行对分布式存储系统的写入操作，从而避免了Hadoop MapReduce中reduce阶段完成后写入分布式系统的等待时间。
 同时Tez也通过复用map任务的部分重复性操作，显著提高了运行效率。
@@ -72,7 +73,7 @@ Spark\cite{spark}的出现和开源（Apache Spark\cite{apachespark}）使分布
 在设计过程中，Spark为用户提供了丰富的接口（groupBy，union等），从而实现了更丰富的计算逻辑表达。
 用户可以通过这些接口来对分布式应用进行编程设计。
 在Spark的核心，用户的计算逻辑通过接口被翻译成了Resilient Distributed Datasets（RDD）之间的转换关系（transformation）。
-连接RDD之间的转换关系最终在执行过程中行成系带（lineage），用来表示执行过程各个阶段之间的数据依赖。
+连接RDD之间的转换关系最终在执行过程中行成系带（lineage），用来表示执行过程中各个阶段之间的数据依赖。
 在应用执行过程中，Spark采用了延迟绑定的策略，在执行时将这些依赖关系通过调度器优化成DAG，用来表达用户定义的计算过程。
 
 图\ref{fig:sparkdag}展示了Spark在执行具体任务时的流程图。
@@ -116,7 +117,7 @@ Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
 而其中的有向边则连接了两个顶点，用来进行信息的传递。
 其具体计算步骤则根据整体同步并行计算模型（Bulk Synchronize Parallel，BSP）来控制。
 如图\ref{fig:pregel}所示，Pregel的执行过程由若干个superstep组成。
-每个Superstep内的所有节点和虚线表示的有向边组合成表达用户计算逻辑的有向图。
+每个superstep内的所有节点和虚线表示的有向边组合成表达用户计算逻辑的有向图。
 其中每个边的方向则代表了一个superstep执行完成之后，节点之间数据流动的方向。
 根据BSP模型，每个superstep会根据全局的同步信号来进行信息传递。
 计算过程最终会在所有节点的算法都终止时结束。
@@ -207,7 +208,7 @@ Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
 
 为了给shuffle过程提供一个具有普适性的优化方案，本文提出了S(huffle)Cache --- 一个开源的即插型shuffle管理系统，给不同的DAG计算框架提供高效的shuffle管理和优化。
 具体来说，SCache通过提供跨框架的API设计，来接管在DAG计算过程中的shuffle阶段。
-同时SCache采用了以下几点关键创新，来实现对于shuffle的高效管理和优化：
+同时SCache采用了以下几点关键创新，来实现对shuffle的高效管理和优化：
 
 \begin{enumerate}
 	\item 将shuffle从计算过程中解耦。使得shuffle的过程独立到DAG计算框架外部进行管理，从而实现了更细粒度的硬件资源管理，提高硬件资源的复用率和利用率，进而加速shuffle过程。
@@ -222,9 +223,9 @@ Pregel中的每个顶点代表一个用户定义并且支持修改的状态。
 
 目前国内外的对shuffle的优化工作主要分成三个方向：提前调度，延迟调度和纯网络层面的优化。
 
-\textbf{提前调度}：Slow-start作为Hadoop MapReduce\cite{hadoop}中最经典的shuffle优化，是提前调度的代表性方案。
+\textbf{提前调度}：Slow-start作为Hadoop MapReduce\cite{hadoop}中经典的shuffle优化，是提前调度的代表性方案。
 Starfish\cite{starfish}通过对数据的采样来自动调整MapReduce中的系统参数，比如slow-start的比例，map和reduce任务的比例等。
-DynMR\cite{dynmr}通过动态的在map阶段末端启动reduce任务来减少对与shuffle数据的等待。
+DynMR\cite{dynmr}通过动态得在map阶段末端启动reduce任务来减少对与shuffle数据的等待。
 以上所有这些方案都没有将I/O操作从计算密集型的任务中解耦，因而仍然在slot中留下显式的I/O等待时间。
 而且由于计算资源有限，提前启动reduce任务会占用有限的slot，减慢map阶段的执行。
 所以在设定何时启动提前调度的参数时，会受到应用，输入数据，当前硬件资源等条件的影响，不仅参数设置困难，优化效果也会有较大波动。
@@ -242,7 +243,7 @@ Quincy\cite{quincy}和Fair Scheduling\cite{preemptive}都可以通过优化map�
 \textbf{网络层优化}：Varys\cite{varys}，Aalo\cite{aalo}，CODA\cite{coda}，Seagull\cite{seagull}都能结合应用层信息提供shuffle在网络传输时的优化，从而加快shuffle的传输过程。
 而DCTCP\cite{dctcp}，pFabric\cite{pfabric}，Pias\cite{pias}，CONGA\cite{conga}等工作能结合数据中心网络的特点在纯网络层降低网络流的平均完成时间，增加网络吞吐。
 虽然这些优化仅仅局限在shuffle过程中的网络传输部分，但是它们可以为本研究的优化提供进一步的性能提升。
-比如本文在进一步优化shuffle的网络传输过程中，采用了Coflow\cite{coflow}的接口和Seagull的调度策略，给shuffle传输提供进一步的优化。
+比如本文在进一步优化shuffle的网络传输过程中，采用了coflow\cite{coflow}的接口和Seagull的调度策略，给shuffle传输提供进一步的优化。
 
 \section{文章结构}
 
@@ -250,13 +251,15 @@ Quincy\cite{quincy}和Fair Scheduling\cite{preemptive}都可以通过优化map�
 
 第二章介绍shuffle在分布式并行DAG计算框架中的特点以及相关背景。通过对shuffle特性的分析，来挖掘其可优化的空间和制定具体优化方案。
 
-第三章详细介绍了SCache的具体设计与实现，包括SCache的架构，shuffle调度算法设计，接口设计，内存管理策略以及网络层进一步优化等。
+第三章详细介绍了SCache的具体优化策略，包括对shuffle数据的预测，reduce任务的预调度，shuffle数据内存缓存机制和网络层的优化方案。
+
+第四章详细介绍了SCache的具体设计与实现，包括SCache的架构，接口设计和工作流程等。
 同时还会结合Spark\cite{apachespark}和Hadoop MapReduce\cite{hadoop}探讨SCache优化方案的普适性。
 
-第四章对SCache在Spark\cite{apachespark}平台上的优化效果进行了实验和分析。
+第五章对SCache在Spark\cite{apachespark}平台上的优化效果进行了实验和分析。
 通过仿真实验和Amazon AWS EC2上虚拟机集群的测试，验证了SCache在shuffle上的优化效果。
 
-第五章对全文进行了总结，并且对未来的工作方向做出展望。
+第六章对全文进行了总结，并且对未来的工作方向做出展望。
 
 
 

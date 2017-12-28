@@ -7,8 +7,8 @@
 \label{chap:evaluation}
 
 本章节将通过综合性的负载和评测程序来测试SCache对Spark性能的优化效果。
-首先我们运行了一个只包含一个shuffle的简单DAG工作来分析硬件利用率的变化。
-同时也通过该工作中具体每个任务来分析SCache的优化带来的影响。
+首先我们运行了一个只包含一个shuffle的简单DAG应用来分析硬件利用率的变化。
+同时也通过该应用中具体每个任务来分析SCache的优化带来的影响。
 之后我们使用了一个公认的含有大量shuffle数据的测试程序Terasort\cite{terasort}来测试不同分区函数下SCache带来的优化。
 
 为了证明SCache能在真实生产环境中带来性能的提升，我们也通过Spark TPC-DS\footnote{https://github.com/databricks/spark-sql-perf}的测试程序来对SCache的优化效果进行测试。
@@ -22,11 +22,11 @@
 同时，在单shuffle的DAG程序中，SCache可以帮助Spark实现在reduce阶段75\%的性能提升。
 对于Terasort的reduce阶段，在SCache的帮助下可以实现50\%的性能提升。
 并且通过启发式预调度算法，相较于Spark调度所产生的经过网络的shuffle数据体积，SCache的优化在加快reduce阶段执行的同时并不会引入额外的网络负载。
-在标准的分布式数据库查询评测程序TPC-DS的测试中，经过SCache对shuffle的优化，可以为其中的查询提供接近40\%的平均优化，效果十分显著。
+在标准的分布式数据库查询评测程序TPC-DS\cite{tpcds}的测试中，经过SCache对shuffle的优化，可以为其中的查询提供接近40\%的平均优化，效果十分显著。
 
 \section{实验平台搭建}
 
-我们在目前应用广泛的Spark分布式计算框架1.6.2版本中实现了SCache的守护进程，并且通过修改Spark任务调度器（\verb|DAGScheduler|和\verb|TaskSchedulerImpl|）来实现了对DAG中shuffle信息和相关任务信息的提交，SCache附属调度器调度结果的获取和采样程序的插入等。
+我们在目前应用广泛的Spark分布式计算框架1.6.2版本中实现了SCache的守护进程，并且通过修改Spark核心组件来实现了对DAG中shuffle信息和相关任务信息的提交，SCache附属调度器调度结果的获取和采样程序的插入等，具体可以参考章节\ref{sec:sparkimpl}。
 同时，我们租用了亚马逊AWS EC2中50个m4.xlarge类型的节点作为测试平台，并且部署修改后的Spark和SCache。
 每个节点的配置如下表所示：
 \begin{table}[!hpb]
@@ -59,7 +59,7 @@
 在此次评测中，我们分别采用了不同体积的输入数据，同时为每一个计算阶段分配了5轮的任务。
 
 在图\ref{fig:scache_util}中展示了在SCache优化下执行该单shuffle依赖的程序时的硬件资源使用情况。
-需要注意的是在SCache的优化下，使得整个工作的执行时间缩短了50\%，因此图\ref{fig:scache_util}中横坐标代表的时间长度只有图\ref{fig:util}的一半。
+需要注意的是在SCache的优化下，使得整个应用的执行时间缩短了50\%，因此图\ref{fig:scache_util}中横坐标代表的时间长度只有图\ref{fig:util}的一半。
 首先可以看到的就是在图\ref{fig:scache_util}中出现了CPU资源利用率峰值和磁盘，网络这些硬件资源利用率峰值的重合。
 这表明了通过SCache对shuffle的解耦以及预取，使得节点中硬件资源的利用率和复用率得到了很大的提升。
 在更细粒度的硬件资源管理下，SCache避免了在原先Spark中因为I/O的操作而无效的占用计算资源的情况。
@@ -80,18 +80,18 @@ SCache的优化在map阶段平均可以带来约10\%的性能提升。
 而图\ref{fig:groupbyreducestage}展示了shuffle数据预取对于需要大量shuffle数据传输的应用，能在reduce阶段带来显著的性能提升。
 这些提升正是因为SCache通过在map阶段对reduce任务实行预调度和shuffle数据的预取，提前了原先Spark模式中shuffle开始的时间，有效地将网络传输时间隐藏在map计算阶段，从而减少了reduce计算阶段启动之后显式的shuffle等待时间，加快了reduce阶段的任务执行。
 对于reduce阶段，SCache带来的性能提升较为显著，平均可以达到大约75\%。
-两者相结合，在对单shuffle依赖的工作的优化过程中，SCache可以减少大约89\%的平均shuffle时间开销。
+两者相结合，在对单shuffle依赖应用的优化过程中，SCache可以减少大约89\%的平均shuffle时间开销。
 
 \begin{figure}[!htp]
 	\centering
 	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbymapstage.pdf}
-	\bicaption[fig:groupbymapstage]{单shuffle依赖工作的map阶段完成时间比较}{单shuffle依赖工作的map阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
+	\bicaption[fig:groupbymapstage]{单shuffle依赖应用的map阶段完成时间比较}{单shuffle依赖应用的map阶段完成时间比较}{Fig}{Map Stage Completion Time of Single Shuffle Test}
 \end{figure}
 
 \begin{figure}[!htp]
 	\centering
 	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbyreducestage.pdf}
-	\bicaption[fig:groupbyreducestage]{单shuffle依赖工作的reduce阶段完成时间比较}{单shuffle依赖工作的reduce阶段完成时间比较}{Fig}{Reduce Stage Completion Time of Single Shuffle Test}
+	\bicaption[fig:groupbyreducestage]{单shuffle依赖应用的reduce阶段完成时间比较}{单shuffle依赖应用的reduce阶段完成时间比较}{Fig}{Reduce Stage Completion Time of Single Shuffle Test}
 \end{figure}
 
 具体到单个计算任务的角度，我们也记录了每个计算阶段中计算任务完成时间处于该阶段所有任务完成时间中位数的那个任务执行过程中具体的时间开销。
@@ -104,9 +104,9 @@ SCache的优化在map阶段平均可以带来约10\%的性能提升。
 所以通过对于任务的细粒度分析，也证明了图\ref{fig:groupbymapstage}中，在map阶段SCache解耦shuffle写的过程并没有带来如reduce阶段那么多的提升。
 
 结合图\ref{fig:groupbyreducetask}，可以观察到在Spark中，相较于map阶段shuffle写的时间开销，reduce阶段计算任务中shuffle读的开销占到整个任务执行时间的比例更大。
-根据我们的实验检测，发现该工作的reduce任务中，shuffle读取过程约占reduce阶段计算任务总时间的50\%。
+根据我们的实验检测，发现该应用的reduce任务中，shuffle读取过程约占reduce阶段计算任务总时间的50\%。
 而这其中的大部分延迟是由网络传输带来的。
-SCache通过在map计算阶段的早期对shuffle数据进行了预取，因此当reduce计算被Spark调度并且开始执行之前，通常情况下只有map计算阶段最后一轮的最后完成的几个任务产生的shuffle数据。
+SCache通过在map计算阶段的早期对shuffle数据进行了预取，当reduce计算被Spark调度并且开始执行之前，通常情况下只有map计算阶段最后一轮的最后完成的几个任务产生的shuffle数据。
 而这部分传输时间由于reduce任务调度的开销以及reduce任务代码序列化等开销，也能被很好的隐藏起来。
 因此在第一轮的reduce任务启动之前，SCache根据任务的预调度信息中的reduce任务ID等信息，已经将数据缓存在了内存当中。
 在图\ref{fig:groupbyreducetask}中可以看到，SCache可以通过shuffle数据预取将reduce计算任务开始之前的shuffle读等待时间几乎完全的隐藏起来。
@@ -115,13 +115,13 @@ SCache通过在map计算阶段的早期对shuffle数据进行了预取，因此�
 \begin{figure}[!htp]
 	\centering
 	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbymaptask.pdf}
-	\bicaption[fig:groupbymaptask]{单shuffle依赖工作的map阶段中位任务比较}{单shuffle依赖工作的map阶段中位任务比较}{Fig}{Median Map Task Completion Time of Single Shuffle Test}
+	\bicaption[fig:groupbymaptask]{单shuffle依赖应用的map阶段中位任务比较}{单shuffle依赖应用的map阶段中位任务比较}{Fig}{Median Map Task Completion Time of Single Shuffle Test}
 \end{figure}
 
 \begin{figure}[!htp]
 	\centering
 	\includegraphics[width=0.7\textwidth]{../../PPoPP-2018/fig/groupbyreducetask.pdf}
-	\bicaption[fig:groupbyreducetask]{单shuffle依赖工作的reduce阶段中位任务比较}{单shuffle依赖工作的reduce阶段中位任务比较}{Fig}{Median Reduce Task Completion Time of Single Shuffle Test}
+	\bicaption[fig:groupbyreducetask]{单shuffle依赖应用的reduce阶段中位任务比较}{单shuffle依赖应用的reduce阶段中位任务比较}{Fig}{Median Reduce Task Completion Time of Single Shuffle Test}
 \end{figure}
 
 
@@ -177,7 +177,7 @@ Terasort最初作为一个针对MapReduce集群性能测试的测试程序，目
 图\ref{fig:tera_shuffle}则展示了Terasort的第二个shuffle过程中，SCache与原生Spark分别产生的网络流量。
 通过网络的传输数据比较，可以直接反映出在reduce任务调度过程中是否实现了较好的本地性。
 如前文所述，该shuffle所产生的数据分布是一个具有极强本地性倾斜的数据。
-因此在最优的调度决策下，是将某个reduce任务调度到该任务所需输入数据含量最高的一个节点，从而将通过网络的shuffle传输数据降到最低。
+因此在负载均衡的前提下，最优的调度决策是将某个reduce任务调度到该任务所需输入数据含量最高的一个节点，从而将通过网络的shuffle传输数据降到最低。
 Spark在进行该轮调度的时候，通过读取RDD每个数据分区的数据本地性依赖来寻找输入数据含量最高的节点，从而将该数据分区所对应的reduce任务调度到对应的节点上，以获得最小的网络数据传输量。
 相对的，SCache则是在map计算阶段通过数据采样的方式来预测shuffle数据的分布，进而预测reduce任务的输入。
 在考虑负载均衡的同时，采用启发式的任务置换方式来获取较好的本地性。
@@ -202,7 +202,7 @@ Spark在进行该轮调度的时候，通过读取RDD每个数据分区的数据
 TPC-DS是一个为数据块查询和数据维持提供通用的模型的测试程序。
 它能够在指定的系统环境和配置下，提供对单一用户数据块查询时间的测试，以及多用户模式下，比如ad-hoc，交互式在线分析查询（OLAP），数据挖掘等的查询吞吐的测试。
 TPC-DS测试程序是业界用来评测大数据系统性能的标准测试程序之一。
-整个TPC-DS测试程序包含了99个不同的数据块查询测试。
+整个TPC-DS测试程序包含了100个不同的数据块查询测试。
 由于在Spark 1.6.2上的SQL兼容性问题，使得其中有部分查询不能被正确执行。
 所以我们选择了其中一部分可兼容的查询进行测试比较，来观察SCache的shuffle优化效果。
 其中有许多查询因为存在多张表的join操作等，会存在较大数据量的shuffle过程。
@@ -211,7 +211,7 @@ TPC-DS测试程序是业界用来评测大数据系统性能的标准测试程�
 其中横坐标表示了TPC-DS中的查询测试程序名称，纵坐标则表示每个查询的完成时间。
 可以看到由于shuffle在运行中占用了大量的时间开销，使得经过SCache优化后的Spark能获得极大的性能优化。
 几乎图中所有的测试，在SCache优化下都能取得显著提升。
-更重要的是，在一些查询测试中，比如q8，q88，q72等，在经过SCache对shuffle的优化后，可以获得将近指数级的性能优化。
+更重要的是，在一些查询测试中，比如q8，q72，q88等，在经过SCache对shuffle的优化后，可以获得将近指数级的性能优化。
 其根本原因是在这些查询中的大量的“union”，“groupby”等SQL语句在Spark上都会通过shuffle的形式来满足这些数据依赖。
 比如图\ref{fig:tpcds}中提升效果最显著的q8，其具体查询代码如代码\ref{code:tpcq8}所示\cite{sparktpcds}：
 
@@ -262,7 +262,7 @@ TPC-DS测试程序是业界用来评测大数据系统性能的标准测试程�
 
 \begin{figure}[!htp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{../../PPoPP-2018/fig/sampling.pdf}
+	\includegraphics[width=0.6\textwidth]{../../PPoPP-2018/fig/sampling.pdf}
 	\bicaption[fig:sampling]{采样过程的开销}{采样过程的开销}{Fig}{Sampling Overhead}
 \end{figure}
 
@@ -279,7 +279,7 @@ TPC-DS测试程序是业界用来评测大数据系统性能的标准测试程�
 此处采样开销的稳定主要得益于中心节点对于每个节点采样数据的收集相对简单。
 首先中心节点收集单节点的数据量是固定的，只包含了采样后的输出数据分布和对应的输入数据体积值，这些数据并不受节点的输入数据体积影响。
 与此同时，由于单节点所需上传的数据较少，因此对于网络传输也不会带来过高的负载。
-而对于中心节点在基于上述收集数据的计算，我们也考虑到预测算法与预调度算法的复杂性，尽可能的用时间复杂度较低的算法来完成预测和任务预调度。
+而对于中心节点在基于上述收集数据后的计算，我们也考虑到预测算法与预调度算法的复杂性，尽可能的用时间复杂度较低的算法来完成预测和任务预调度。
 综上所述，采样过程的开销在集群节点数的维度上能保持相对稳定，而实验结果也很好的证明了在设计过程中的优化措施，使得中心节点不会成为影响整个集群可扩展性的瓶颈。
 
 \section{网络层优化}
@@ -308,7 +308,7 @@ Smallest-Effective-Bottleneck-First（SEBF）和Minimum-Allocation-for-Desired-D
 因此对于coflow 1和coflow 2在平均调度策略的调度下，两者的完成时间均是6。
 所以其平均coflow完成时间
 \begin{equation}
-    average CCT = \frac{6 + 6}{2} = 6。
+    average\, CCT = \frac{6 + 6}{2} = 6。
 \end{equation}
 而在SEBF的策略中，如图\ref{fig:coflowsebf}所示，coflow 1的长度为3，而coflow 2的长度为4，因此coflow 1将优先传输。
 与此同时，MADD算法会将coflow 1中其他两个体积较小流的完成时间延长到与其长度3一致。
@@ -316,7 +316,7 @@ Smallest-Effective-Bottleneck-First（SEBF）和Minimum-Allocation-for-Desired-D
 在这种调度策略下，coflow 1的完成时间是3，而coflow 2的完成时间是6。
 所以其平均coflow完成时间
 \begin{equation}
-    average CCT = \frac{3 + 6}{2} = 4.5。
+    average\, CCT = \frac{3 + 6}{2} = 4.5。
 \end{equation}
 
 \begin{figure}[!htp]
@@ -341,10 +341,10 @@ Smallest-Effective-Bottleneck-First（SEBF）和Minimum-Allocation-for-Desired-D
 	\bicaption[fig:coflowsim]{不同调度策略下的shuffle网络传输模拟实验}{不同调度策略下的shuffle网络传输模拟实验}{Fig}{Simulation of Shuffle Network Transfer under Different Scheduling Schemes}
 \end{figure}
 
-在模拟实验中，我们抽取了OpenCloud中所有任务的shuffle数据，并且通过对每个工作对应的shuffle时间进行聚合，形成一个coflow调度单元。
-对于每一个coflow单元，他们独自占用模拟实验中的网络时的完成时间累计分布如图\ref{fig:coflowcdf}所示。
+在模拟实验中，我们抽取了OpenCloud中所有任务的shuffle数据，并且通过对每个应用对应的shuffle时间进行聚合，形成一个coflow调度单元。
+对于每一个coflow单元，他们独自占用模拟实验中的网络时的完成时间累积分布如图\ref{fig:coflowcdf}所示。
 其平均完成时间5.33秒，从图\ref{fig:coflowcdf}中可以看出其中大部分该日志中的shuffle网络传输时间均集中在平均值附近，只存在少量大体积的shuffle传输。
-这也与图\ref{fig:cdf}中得出的结论匹配，即OpenCloud日志中大部分工作的shuffle开销较小。
+这也与图\ref{fig:cdf}中得出的结论匹配，即OpenCloud日志中大部分应用的shuffle开销较小。
 
 根据这些coflow单元的数据，实验随机模拟了不同等级并发量的shuffle同时传输的情景，通过传统网络的平均调度策略，以及SEBF和MADD算法分别对当下并发的shuffle传输进行调度。
 模拟实验在不同算法以及并发量下求出了每个并发shuffle下的coflow平均完成时间（average CCT）。

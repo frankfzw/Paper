@@ -19,7 +19,7 @@
 在每一个map任务内部，计算框架会根据用户定义的计算方法和现阶段的数据，对于其中一个数据分区（partition）进行计算。
 计算完成之后，map任务就会根据用户定义的分区函数（比如哈希分区或者排序分区），将计算产生的中间结果（键值对）进行分块存储。
 其中存储这些代表中间结果的键值对的数据块的数目等同于下一个计算阶段（reduce）的任务数目。
-这些分块的数据即在shuffle阶段通过网络传输的数据。这些数据块往往会在分块结束之后被写入本地磁盘。
+这些分块的数据即在shuffle阶段通过网络传输的数据。他们往往会在分块结束之后被写入本地磁盘。
 
 在reduce阶段开始真正的计算之前，首先要通过网络从远程的节点的磁盘上拉取map阶段产生的属于该任务输入的部分shuffle数据块，即图\ref{fig:workflow}中的“shuffle read”部分。
 
@@ -28,10 +28,10 @@
 也就是说在分配计算任务时，分布式DAG计算框架的调度器默认其为计算密集型任务，因此会根据各个节点计算资源（比如CPU的空闲核数）来申请资源并调度任务。
 但是任务被调度之后，却没有充分利用计算资源，反而在占用计算资源的情况下进行大量的I/O操作。
 正因为这种粗粒度的调度和集成在计算任务中的I/O操作，使得硬件资源的利用率和复用率严重受损，进而损害了计算框架本身的性能。
-有相关研究表明，Yahoo!公司中60\%的MapReduce工作和Facebook公司中20\%的MapReduce工作中存在大量的shuffle数据\cite{shufflewatcher}。
-对于这些存在大量shuffle的工作中，shuffle传输所带来的延迟甚至会成为整个工作完成时间的瓶颈。
-比如在一份Facebook公司公开的MapReduce任务日志中，shuffle过程的平均占用了整个工作完成时间的33\%。
-对于那些存在大量shuffle的工作，shuffle的开销甚至最多占用了整个工作完成时间的70\%\cite{managing}。
+有相关研究表明，Yahoo!公司中60\%的MapReduce应用和Facebook公司中20\%的MapReduce应用中存在大量的shuffle数据\cite{shufflewatcher}。
+对于这些存在大量shuffle的应用中，shuffle传输所带来的延迟甚至会成为整个应用完成时间的瓶颈。
+比如在一份Facebook公司公开的MapReduce任务日志中，shuffle过程的平均占用了整个应用完成时间的33\%。
+对于那些存在大量shuffle的应用，shuffle的开销甚至最多占用了整个应用完成时间的70\%\cite{managing}。
 
 \begin{figure}[!htp]
 	\centering
@@ -64,7 +64,7 @@ Spark GroupByTest是一个包含两轮计算阶段，中间通过一次shuffle�
 \subsection{粗粒度的资源分配}
 
 在现有的硬件资源分配机制下，当一个slot被计算框架分配给一个任务的时候，只有在该任务执行结束，这个slot以及其对应的硬件资源才会被释放。
-对于一个map任务的结束是在他完成了shuffle write之后。
+一个map任务的结束是在他完成了shuffle write之后。
 而在reduce任务一端，当一个reduce任务占用一个slot之后，它首先需要的只是通过一些I/O操作来获取远程的shuffle数据。
 而在图\ref{fig:util}中，可以看到shuffle数据的写入和shuffle数据的读取都是I/O密集型操作，在这两个阶段，slot中的CPU利用率很低。
 反过来，在进行计算的过程中，节点上的I/O资源则被大量闲置。

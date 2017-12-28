@@ -27,11 +27,11 @@
 \begin{enumerate}
     \item 将shuffle过程从计算过程中解耦，使得shuffle过程独立到外部进行管理，从而实现了更细粒度的硬件资源管理。
     \item 结合应用的上下文对shuffle数据进行预取，既避免了同步数据读取给网络带来的压力，又能将大部分网络传输时间隐藏到计算阶段。
-    \item 结合应用的上下文对shuffle数据内存管理和内存缓存，进一步提升shuffle过程的效率。
+    \item 结合应用的上下文对shuffle数据进行内存缓存，进一步提升shuffle过程的效率。
     \item 根据现有的分布式计算框架shuffle的特点设计了相应的接口(API)。通用的接口设计使得优化能被应用到不同的分布式并行计算框架当中。
 \end{enumerate}
 
-基于以上阐述，本研究课题实现了SCache，同时修改了Apache Spark对SCache进行适配。
+基于以上阐述，本研究课题实现了SCache，同时修改了Apache Spark\cite{apachespark}对SCache进行适配。
 并且通过仿真实验和Amazon AWS EC2集群上大规模数据测试来验证其优化效果。
 在不同的数据集和测试程序的测试中，SCache能减少将近89\%的shuffle开销。
 在TPC-DS的测试中，SCache的优化能给分布式SQL查询带来平均大约40\%的性能提升。
@@ -71,7 +71,7 @@ In order to achieve the optimizations, we make following contributions:
     \item Design and implement the general APIs for the DAG data parallel computing frameworks so that the optimizations can be applied easily.
 \end{enumerate}
 
-We have implemented SCache and customized Spark to use it as the external shuffle service and co-scheduler. 
+We have implemented SCache and customized Apache Spark\cite{apachespark} to use it as the external shuffle service and co-scheduler. 
 The performance of SCache is evaluated with both simulations and testbed experiments on a 50-node Amazon EC2 cluster.
 Those evaluations have demonstrated that, by incorporating SCache, the shuffle overhead of Spark can be reduced by nearly 89\%, 
 and the overall completion time of TPC-DS queries improves 40\% on average.

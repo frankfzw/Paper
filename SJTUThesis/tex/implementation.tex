@@ -38,16 +38,16 @@ SCache的工作节点会在本地占用一部分内存空间用来存储shuffle�
 
 与此同时，当本地的内存空间不够时，各个工作节点会根据从主节点收到的shuffle数据块优先级信息，结合本地的缓存信息（比如是否存在不完整的shuffle存储单元）来将一部分shuffle数据先保存到磁盘上。
 本地的工作节点会在内存中至少缓存一个优先级最高的reduce任务需要的shuffle数据块。
-当本地工作节点的shuffle缓存数据被任务消耗时，该部分内存空间就会被释放，而在磁盘中缓存的较高优先级的数据就会被立刻放入内存中。
-通过结合主节点的优先级信息，本地shuffle的缓存状况以及Spark任务对shuffle数据的访问状况，工作节点的调度可以保证相对独立的完成内存管理并且保证：（1）shuffle数据可以在reduce任务开始执行前就被缓存在内存当中并且（2）shuffle数据的内存缓存不会破坏全部或没有以及应用优先级的限制。
+当本地工作节点的shuffle缓存数据被任务消耗时，该部分内存空间就会被释放，而在磁盘中保存的较高优先级的数据就会被立刻放入内存中。
+通过结合主节点的优先级信息，本地shuffle的缓存状况以及Spark任务对shuffle数据的访问状况，工作节点的调度可以保证相对独立得完成内存管理并且保证：（1）shuffle数据可以在reduce任务开始执行前就被缓存在内存当中并且（2）shuffle数据的内存缓存不会破坏全部或没有规则以及应用优先级的限制。
 
-SCache中的DAG附属调度器主要负责从Spark的Driver中获取DAG的信息，包括相邻map阶段和reduce阶段之间shuffle的数目，map任务的个数和reduce任务的个数以及当前map任务的shuffle输出的数据分布或者采样任务之后的数据分布。
+SCache中的DAG附属调度器主要负责从Spark的driver中获取DAG的信息，包括相邻map阶段和reduce阶段之间shuffle的数目，map任务的个数和reduce任务的个数以及当前map任务的shuffle输出的数据分布或者采样任务之后的数据分布。
 DAG附属调度器会根据以上信息采用相应的线性回归算法或者采样算法来预测shuffle数据的分布，同时调用算法\ref{mhminheap}和算法\ref{hminheap}来作出一个启发式的reduce任务预调度。
 在获得最终调度结果之后，附属调度器会将调度结果发送给SCache的主节点。
 同时该调度结果也会在Spark任务调度器调度reduce阶段的任务之前将预调度的结果发送到任务调度器上。
 
 守护进程以一个独立线程的形式存在于Spark的内存空间，通过远程过程调用（Remote Procedure Call，RPC）的方式与SCache进行通信。
-守护进程同时还负责向Spark系统内部的具体执行map任务和reduce任务的线程以及Spark任务调度器和Driver提供SCache相应的接口。
+守护进程同时还负责向Spark系统内部的具体执行map任务和reduce任务的线程以及Spark任务调度器和Spark的driver提供SCache相应的接口。
 
 \begin{table}[!hpb]
     \centering
@@ -77,7 +77,7 @@ DAG附属调度器会根据以上信息采用相应的线性回归算法或者�
 	\bicaption[fig:regshuffle]{注册shuffle时序图}{注册shuffle时序图}{Fig}{Sequence Diagram of Shuffle Registration}
 \end{figure}
 
-当一个Spark的工作启动时，首先会根据用户的代码生成一个关于RDD（Resilient Distributed Datasets）的系带关系（lineage）。
+当一个Spark的应用启动时，首先会根据用户的代码生成一个关于RDD的系带关系（lineage）。
 之后Spark的调度器会从最终的用户RDD递归向前寻找依赖的RDD。
 在RDD之间的数据依赖中，如果存在部分依赖，也就是shuffle依赖，Spark会在此处插入一个shuffle过程，并且将之前的所有RDD合并成一个计算阶段（stage）。
 递归寻找的过程会在当一个RDD的数据已经被计算或者已经到了存储系统的部分就会停止。
@@ -85,7 +85,7 @@ DAG附属调度器会根据以上信息采用相应的线性回归算法或者�
 
 对于DAG中相邻计算阶段之间的shuffle依赖，它们会被打包成一个RPC的调用提交到SCache的从属调度器上。如表\ref{tab:apis}中，一个shuffle依赖需要包含一个唯一的整数ID代表该Spark应用程序。
 同时该RPC还需要包含这个shuffle依赖中每个shuffle的ID，以及它们对应的分区函数的类型，map阶段任务数和reduce阶段的任务数。
-在收到注册shuffle的RPC之后，SCache的DAG附属调度器会首先检查分区函数的类型，如果不是哈希分区函数，就会通过在Spark的Driver上的守护进程在Spark执行该计算阶段前插入一段采样程序。
+在收到注册shuffle的RPC之后，SCache的DAG附属调度器会首先检查分区函数的类型，如果不是哈希分区函数，就会通过在Spark的driver上的守护进程在Spark执行该计算阶段前插入一段采样程序。
 我们会在章节\ref{sec:sampling}和章节\ref{sec:impl}中详细阐述这个过程。
 
 在之后的map计算阶段任务执行与shuffle数据收集过程中的时序图如图\ref{fig:putblock}所示。
@@ -118,7 +118,7 @@ DAG附属调度器会根据以上信息采用相应的线性回归算法或者�
 在SCache的中心节点完成预调度之后的流程具体如图\ref{fig:preschedule}所示。
 当预调度算法运行结束之后，SCache的主节点会将reduce任务与计算节点的映射关系进行广播。
 每个工作节点的SCache进程收到预调度的信息之后，会根据节点信息做出筛选，选出需要在本地执行的reduce任务。
-此后本地节点会根据相应的工作ID，shuffle依赖ID，map任务ID，以及即将在本地执行的reduce任务ID组合而成的blockId，查询获取该数据块所在的节点位置，之后便开始从该远程节点预取数据。
+此后本地节点会根据相应的应用ID，shuffle依赖ID，map任务ID，以及即将在本地执行的reduce任务ID组合而成的blockId，查询获取该数据块所在的节点位置，之后便开始从该远程节点预取数据。
 当一个数据块被预取之后，其在节点的内存缓存就会被释放。
 
 在reduce任务被调度的阶段，为了使Spark任务调度器遵循SCache的预调度结果，我们修改Spark的DAG调度器，通过表\ref{tab:apis}中getShuffleStatus的接口获取SCache预调度的任务 --- 节点映射关系。
@@ -127,7 +127,7 @@ DAG附属调度器会根据以上信息采用相应的线性回归算法或者�
 \section{水塘抽样}
 \label{sec:sampling}
 
-在上文的工作流程中，如果在注册shuffle时SCache检测到不是哈希分区函数，则SCache部署在Spark主节点上的守护进程会在使用非哈希分区函数的RDD中调用其$mapPartitionsWithIndex$\cite{sparksource}方法对每个分区的数据进行水塘采样。
+在上文的工作流程中，如果在注册shuffle时SCache检测到不是哈希分区函数，则SCache部署在Spark主节点上的守护进程会在使用非哈希分区函数的RDD中调用其\verb|mapPartitionsWithIndex|\cite{sparksource}方法对每个分区的数据进行水塘采样。
 如图\ref{fig:sample}所示，对于每个计算节点的本地采样程序，我们使用了经典的水塘采样算法\cite{reservoir}，对每个数据分区中的输入数据进行随机采样计算并且统计经过分区函数分区后的输出shuffle数据分布。
 在具体实现中，对于采样的样本数，我们将其设置为“$3 \times $数据块数目”，以此来平衡采样的精确度和采样的开销。
 此处采样的样本数可以根据用户配置进行调整。
@@ -154,7 +154,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 同时，SCache的工作节点会定期向主节点发送心跳信息，一旦主节点没有收到其中一个工作节点的心跳，就可以通过远程脚本控制其在本地重启。
 当工作节点重启之后，主节点会向其发送当前shuffle的调度状态，工作节点则会根据本地磁盘的shuffle数据块备份状况和当前的shuffle状态来判断是否有未完成的shuffle数据块预取以及缓存任务。
 而在工作节点进程失效的过程中，Spark的执行器如果有相应的reduce任务执行需要数据，则会被其中的守护进程阻塞住，直到本地工作进程完成重启。
-对于SCache主节点的容错性，由于主节点的进程只服务于一个Spark的Driver程序，并且不需要调度对于跨工作的shuffle数据依赖，因此主节点采用了简单的本地磁盘备份日志的方式来备份当前对于相关shuffle的元数据记录和调度记录等信息。
+对于SCache主节点的容错性，由于主节点的进程只服务于一个Spark的driver程序，并且不需要调度对于跨应用的shuffle数据依赖，因此主节点采用了简单的本地磁盘备份日志的方式来备份当前对于相关shuffle的元数据记录和调度记录等信息。
 
 为了降低系统复杂度，SCache在设计的过程中并未引入应对节点崩溃下线的容错机制。
 省略这部分机制的原因主要有以下几点：
@@ -173,7 +173,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 \end{itemize}
 
 虽然在设计中省略了对节点下线的容错性，但是为了保证DAG计算过程在发生错误时仍然能够正确执行，SCache在此处采用了借助DAG计算框架容错性的恢复模式。
-比如在上文提到的Spark恢复模式中，该失效的RDD分区会进行一个重新分区的并行计算，而在此过程中，SCache对于shuffle的优化将对这部分逻辑进行重新提交和分配。
+比如在上文提到的Spark恢复模式中，该失效的RDD分区会进行一个重新分区的并行计算，而在此过程中，SCache对于shuffle的优化将对这部分逻辑进行重新提交，任务预调度和数据预取。
 通过借助DAG计算框架本身的容错性，SCache能保证在节点下线的恢复过程中不破坏任务的正确性，同时提供对恢复中的shuffle优化。
 
 \section{普适性分析}
@@ -184,6 +184,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 通过以上两个方面的分析和探索，最终可以证明SCache提供的优化方案可以在不需要大量改造成本的情况下即可适配目前主流的分布式DAG框架。
 
 \subsection{Spark的实现分析}
+\label{sec:sparkimpl}
 本次实现中，我们利用Spark这个被广泛应用的分布式DAG计算平台来对SCache的优化进行适配。
 在Spark上的修改主要集中在以下几个方面。
 
@@ -225,7 +226,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 
 其次，我们修改了Spark的\verb|DAGScheduler|来实现对DAG信息的获取。
 具体可以参考如代码\ref{code:dagScheduler}。
-在Spark的Driver节点上也存在相应的\verb|Daemon|进程。
+在Spark的driver节点上也存在相应的\verb|Daemon|进程。
 当Spark的\verb|DAGScheduler|在从最终的RDD递归向前建立DAG的过程中（\verb|getParentStages|函数），如果发现RDD之前的依赖关系是shuffle依赖，则通过\verb|env.scacheDaemon|
 获取本地已经初始化好的守护进程实例，并通过\verb|registerShuffles|接口向SCache提交该shuffle依赖的元数据。
 
@@ -275,12 +276,13 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
       }
     }
 \end{lstlisting}
-同时，为了使Spark的执行器在执行map任务时能够将数据发送给SCache，我们实现了一个\verb|ScacheBlockObjectWriter|用来完成map任务的shuffle数据内存拷贝。
+同时，为了使Spark的执行器在执行map任务时能够将数据发送给SCache，我们实现了一个处理shuffle数据写的类
+---\verb|ScacheBlockObjectWriter|来完成map任务的shuffle数据内存拷贝。
 \verb|ScacheBlockObjectWriter|实现了对Spark原来的\verb|DiskBlockObjectWriter|的继承，并且重载了其中的方法。
 代码\ref{code:writer}展示了\verb|ScacheBlockObjectWriter|在继承过程中对比较重要的几个方法实现了重载。
 在这里去掉了原先的磁盘写操作，取代的是对内存缓存空间的数据写入以及内存拷贝，从而优化了map计算任务的磁盘阻塞。
 
-而在reduce阶段，我们修改了\verb|ShuffleBlockFetcherIterator|中获取shuffle数据的方法，即调用\verb|ScacheBlockTransferService|中的相应接口来从SCache获取shuffle的数据块。
+在reduce阶段，我们修改了\verb|ShuffleBlockFetcherIterator|中获取shuffle数据的方法，即调用\verb|ScacheBlockTransferService|中的相应接口来从SCache获取shuffle的数据块。
 虽然此处的数据访问通过内存拷贝来完成，但是为了进一步提高性能，以及预防在网络极端拥塞的情况下，最后一轮的几个map任务的输出shuffle数据仍然没有传输完成，在向SCache获取shuffle数据块的时候，
 采用了多线程异步非阻塞的方式。
 这种实现方式能在第一时间将已经缓存的shuffle数据块返回给Spark的reduce任务进行计算，因而能将获取shuffle数据时产生对计算的阻塞的可能性降到最低。
@@ -317,7 +319,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 \end{lstlisting}
 
 在插入采样程序部分，我们利用了Spark中\verb|RangePartitioner|在决定分区边界时对RDD进行计算的过程，在其中插入了采样过程。
-为了提高效率，对RDD数据的采样以及分区的计算是在Spark的Driver内部进行。
+为了提高效率，对RDD数据的采样以及分区的计算是在Spark的driver内部进行。
 计算完成之后再将数据发送给SCache，具体逻辑如代码\ref{code:sample}所示。
 其中返回的\verb|distribution|将会作为采样的分布通过接口\ref{tab:apis}中的\verb|sampling|发送给SCache。
 以上四个部分是在Spark适配过程中做出的主要改动，其代码量大约在1000行左右，相较于Spark本身几十万行的代码量，可以说这个改动是非常的小。
@@ -371,7 +373,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 在具体执行过程中，其通过实例化一个\verb|collector|来进行写操作，而该\verb|collector|就是一个\verb|MapOutputCollector.java|的具体实例。
 具体代码参考代码片段\ref{code:hadoopmap}
 
-\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中Map阶段的shuffle写代码片段}, label={code:hadoopmap}]
+\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中map阶段的shuffle写代码片段}, label={code:hadoopmap}]
     private <...>
     void runNewMapper(...) throws ... {
         // Skip
@@ -423,7 +425,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
 在目前的MapReduce中，该接口由类\verb|Shuffle<K, V>|实现了一个多线程的异步远程shuffle数据读取。
 具体可以参考代码片段\ref{code:hadoopreduce}。
 
-\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中Reduce阶段的shuffle读代码片段}, label={code:hadoopreduce}]
+\begin{lstlisting}[language={Java}, caption={Hadoop MapReduce中reduce阶段的shuffle读代码片段}, label={code:hadoopreduce}]
     public class ReduceTask extends Task {
         public void run(...) throws ... {
           // Skip
@@ -469,7 +471,7 @@ reduce任务所产生的数据块大小，之后主节点会根据reduce的任�
     此时，便可以将这些数据通过接口\ref{tab:apis}中的\verb|registerShuffles|进行提交。
     \item Map任务shuffle数据的解耦：可以通过重新实现一个对接口\verb|MapOutputCollector|的实现类来获取shuffle数据，并且通过内存拷贝传递给SCache。
     \item Reduce任务shuffle数据的解耦：可以通过重新实现一个接口\verb|ShuffleConsumerPlugin|的实现类来从SCache的内存缓存获取shuffle的数据。
-    \item Reduce任务的预调度：需要将SCache的预调度结果通过接口在\verb|RMContainerAllocator.java|调度任务前对预调度结果进行获取，然后在其调用\verb|assignToReduce|函数时遵循预调度的结果即可。
+    \item Reduce任务的预调度：需要将SCache的预调度结果通过接口在\verb|RMContainerAllocator|调度任务前对预调度结果进行获取，然后在其调用\verb|assignToReduce|函数时遵循预调度的结果即可。
     \item 采样任务的实现：在\verb|JobImpl|类中生成具体任务的时候，可以通过配置信息来获取分区函数的信息。
     如果发现是一个非哈希的分区函数，则在创建map任务的同时创建每个任务对应的采样任务对其进行数据采样。
 \end{enumerate}
