@@ -29,7 +29,7 @@
 即通过修改分布式DAG计算框架的部分代码，使得map任务在进行键值对分区结束后，通过内存拷贝将分区好的数据块移动到SCache的内存空间。
 而在内存拷贝完成之后，该任务的slot就会被立即释放。
 
-在reduce阶段，每一个任务开始之前，都会通过网络从远程节点的磁盘中读取该任务需要的shffle数据块，也就是图\ref{fig:workflow}中的“shuffle read”部分。
+在reduce阶段，每一个任务开始之前，都会通过网络从远程节点的磁盘中读取该任务需要的shuffle数据块，也就是图\ref{fig:workflow}中的“shuffle read”部分。
 与map任务相似，在执行shuffle数据拉取的过程中，CPU资源将会被闲置。
 但是与map任务不同的是，由于shuffle数据的读取是在任务开始之前，所以要优化这部分开销，就需要提前读取远程的shuffle数据到本地节点，也就是shuffle数据的预取。
 为了实现shuffle数据的预取，SCache会根据任务预调度的结果，在map阶段就开始shuffle数据的网络传输。

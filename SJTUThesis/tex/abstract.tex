@@ -11,17 +11,17 @@
 在执行DAG的每一个计算阶段时，这些计算框架大多采用了整体同步并行计算模型(Bulk-Synchronous Parallel, BSP)来对大数据进行分布式的并行批处理。
 
 在这些相邻的计算阶段之间，shuffle，或者说跨网络的多对多分块数据的读写满足了计算逻辑对于不同数据的依赖。与此同时，shuffle的过程也带来了大量的网络数据传输。
-受限于计算对于数据的依赖以及网络，磁盘等硬件性能，使得依赖于shuffle的这些任务的性能会因为shuffle的开销而受到巨大损失。
-尤其是在一些需要大量shuffle数据的情境中，比如两张数据库大表的交集，shuffle的开销甚至会成为整个应用的性能瓶颈。
+受限于计算任务对于数据的依赖和本身低效率的设计实现，shuffle过程会给计算任务的性能带来巨大损失。
+尤其是在一些需要大量shuffle数据的情境中，shuffle的开销甚至会成为整个应用的性能瓶颈。
 更重要的是，这个问题在大多数分布式并行计算框架中都普遍存在。
 
-为了提供一种具有普遍意义的shuffle优化方案，本研究抽取了这些系统在shuffle设计中存在的一些共性问题：1)粗粒度的硬件资源管理降低了资源的可复用性, 比如使得计算资源在进行I/O操作时长时间闲置。
-2)同步滞后的shuffle读取不仅增加了计算任务执行过程中对shuffle网络传输的显式等待时间，也给网络带来一个瞬时的流量高峰，进一步减慢了网络传输过程。
+为了提供一种具有普遍意义的shuffle优化方案，本研究抽取了这些系统在shuffle设计中存在的一些共性问题：1)粗粒度的硬件资源管理降低了资源的利用率和复用率。
+2)同步滞后的shuffle读取既增加了计算任务执行时对shuffle网络传输的显式等待时间，又给网络带来一个瞬时的流量高峰。
 
 针对以上问题，本文提出了S(huffle)Cache --- 一个开源的即用型系统来优化DAG计算过程中的shuffle阶段。
-通过在计算阶段真正执行前提取表达计算逻辑的DAG以及其中的shuffle依赖关系，SCache可以将shuffle过程从DAG计算过程中解耦合，从而提供更细粒度的硬件资源管理，提高资源利用率和复用率。
-与此同时，SCache通过提前异步的shuffle传输来隐藏任务计算过程中显式的网络等待时间，同时也减缓了shuffle给网络带来的压力。
-此外，SCache还利用结合应用上下文的内存管理，来实现对shuffle数据的内存缓存，进一步提升shuffle过程的效率。
+通过在计算阶段真正执行前提取表达计算逻辑的DAG以及其中的shuffle依赖关系，SCache可以将shuffle过程从DAG计算过程中独立出来，从而提供更细粒度的硬件资源管理。
+与此同时，SCache通过提前异步的shuffle传输来解决目前同步滞后的shuffle读取过程。
+此外，SCache还利用内存来实现对shuffle数据的缓存，进一步提升shuffle过程的效率。
 为了实现以上的优化目标，本研究做出了以下主要贡献：
 
 \begin{enumerate}
@@ -51,10 +51,10 @@ Shuffle, or the cross-network read and aggregation of partitioned data among tas
 usually brings in large network transfer. 
 Due to the dependency constrains and the limited performance of disks and networks, execution of those descendant tasks could be delayed by inefficient shuffles. 
 This delay can further slow down the whole application process. 
-The performance degradation introduced by shuffle can become overwhelming in the shuffle intensive applications such as a join of two big tables.
+The performance degradation introduced by shuffle can become overwhelming in the shuffle intensive applications.
 Moreover, the above deficiencies of shuffle generally exist in most of the DAG data parallel computing frameworks. 
 In this paper, we extract the common issues in current shuffle mechanism: 
-1) The coarse granularity resource management decreases the utilization and multiplexing of hardware resources. For example, the inefficient management can keep CPU idle while tasks doing I/O operations.
+1) The coarse granularity resource management decreases the utilization and multiplexing of hardware resources.
 2）The synchronized shuffle read increases the explicit network waiting time during task execution and brings a network burst which further slows down the shuffle read itself.
 
 Based on the above observations, we present S(huffle)Cache --- an open source plug-in system that particularly focuses on shuffle optimization in frameworks defining jobs as DAGs. 
