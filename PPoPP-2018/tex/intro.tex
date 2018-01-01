@@ -2,6 +2,9 @@
 Recent years have witnessed widespread use of sophisticated frameworks such as Dryad \cite{dryad}, Spark \cite{spark}, and Apache Tez \cite{tez}.
 Despite the differences among data-intensive frameworks, their communication is always structured as a shuffle phase,  which takes place between successive computation stages. Such shuffle phase places significant burden for both the disk and network I/O, thus heavily affecting the end-to-end application performance. For instance, a MapReduce trace analysis from Facebook shows that shuffle accounts for 33\% of the job completion time on average, and up to 70\% in shuffle-heavy jobs\cite{managing}.
 
+\ifrevision
+\marginnote{A2}
+\fi
 Although continued efforts of performance optimization have been made among a variety of computing frameworks \cite{sync, babu, tachyon, pacman, quincy, delay}, the shuffle is often poorly optimized in practice.
 % take over shuffle
 %shuffle characteristic

@@ -22,9 +22,18 @@
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
 \usepackage{perpage} %the perpage package
-\MakePerPage{footnote} %the perpage package command
 \usepackage{url}
+\usepackage{marginnote}
+\usepackage{color,soul}
 
+\definecolor{myyellow}{rgb}{1.0, 0.98, 0.77}
+\newcommand{\hlyellow}[1]{{\sethlcolor{myyellow}\hl{#1}}}
+
+\newif\ifrevision
+\revisiontrue
+
+
+\MakePerPage{footnote} %the perpage package command
 
 %\makeatletter\if@ACM@journal\makeatother
 %%% Journal information (used by PACMPL format)
