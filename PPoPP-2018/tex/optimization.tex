@@ -1,28 +1,55 @@
-\section{Shuffle Optimization}\label{opt}
-This section presents the detailed methodologies to achieve three design goals. The out-of-framework shuffle data management is used to decouple shuffle from execution and provide a cross-framework optimization. Two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}) are used to achieve shuffle data pre-fetching without launching tasks.
+\section{Shuffle Optimization}
+\label{opt}
+This section presents the detailed methodologies to achieve three design goals. 
+The out-of-framework shuffle data management is used to decouple shuffle from execution and provide a cross-framework optimization. 
+Two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}) and \hlyellow{a co-scheduler} are used to achieve shuffle data pre-fetching without launching tasks.
 
 \subsection{Decouple Shuffle from Execution}
-During map tasks, the partitioner takes a set of key-value pairs as input and calculates the partition number for each of them by applying pre-defined the partition function. After that, it stores all key-value pairs in the corresponding data blocks. Each of the block contains the key-value pairs for one reduce partition. At the same time, blocks will be spilled to disk. In order to avoid blocking the slot by disk operation, we use memory copy to hijack shuffle data from map tasks. By doing this, a slot can be released as soon as a task finishes CPU intensive computing. 
-From the perspective of reduce task, shuffle read is decoupled by pre-fetching shuffle data to local SCache client before reduce tasks start.
-
-\begin{figure}
-	\centering
-	\includegraphics[width=0.75\linewidth]{fig/sim}
-	\caption{Stage Completion Time Improvement of OpenCloud Trace}
-	\label{fig:sim}
-\end{figure}
+To achieve the decouple from map tasks and reduce tasks, the original shuffle write and read implementation in the current frameworks should be modified to apply the API of SCache.
+\ifrevision
+\reversemarginpar
+\marginnote{60B}
+\fi
+\hlyellow{
+During shuffle write of map tasks, the partitioned shuffle data blocks will be written on the disks.
+Each block contains a part of input data of a particular reduce task. 
+To avoid the release of a slot being blocked by disk operation, SCache provides a disk-write-like API named $putBlock$ to handle the shuffle write.
+Inside the $putBlock$, SCache uses memory copy to move the shuffle data blocks out of map tasks and store them in the reserved memory.
+At the same time, the slot will be released immediately.
+From the perspective of reduce task, SCache provides an API named $getBlock$ to replace the original implementation of shuffle read. 
+With the precondition of shuffle data pre-fetching, 
+the $getBlock$ leverages the memory copy to get the shuffle data requested by a reduce task from SCache.
+Instead, the original implementation of shuffle read will trigger a network transfer that keeps CPU idle.
+}
 
 \begin{figure}
 	\centering
 	\includegraphics[width=0.6\linewidth]{fig/reduce_cdf}
 	\caption{Shuffle Time Fraction CDF of OpenCloud Trace}
 	\label{fig:cdf}
+	\vspace{-1em}
 \end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.75\linewidth]{fig/sim}
+	\caption{Stage Completion Time Improvement of OpenCloud Trace}
+	\label{fig:sim}
+	\vspace{-1em}
+\end{figure}
+
 %To this end, all I/O operations are managed outside of the DAG framework, and the slot is occupied only by the CPU intensive phases of task.
 \subsection{Pre-schedule with Application Context}
-The pre-scheduling and pre-fetching start when the collected shuffle data exceeds the threshold.
-This is the most critic step toward the optimization. The task --- node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. Once the tasks are scheduled, the slots will be occupied to launch them. On the other hand, the shuffle data cannot be pre-fetched without the readiness of task --- node mapping.
-To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}). That is, the task --- node mapping is established ahead of DAG framework scheduler, and it is enforced to DAG scheduler before the real scheduling.
+\hlyellow{
+The pre-scheduling and pre-fetching the most critic steps toward the optimization. 
+The task --- node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. 
+Once the tasks are scheduled, the slots will be occupied to launch them. 
+On the other hand, the shuffle data cannot be pre-fetched without the awareness of task --- node mapping.
+}
+To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}). 
+\hlyellow{
+That is, the task --- node mapping is established ahead of the task scheduling, and then it is enforced to the DAG scheduler when the task scheduling starts.
+}
 
 \begin{figure}
 	\centering
@@ -59,11 +86,22 @@ To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic
 % \end{figure*}
 % \begin{figure}
 \subsubsection{Problem of Random Mapping}\label{randomassign}
-The simplest way of pre-scheduling is mapping tasks to different nodes randomly. It only guarantees that each node run same number of tasks. 
-As shown in Figure \ref{fig:sim}, we use traces from OpenCloud \footnote{\label{fn:trace}http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html} for the simulation to evaluate the impact of different pre-scheduling algorithms. The baseline (red dot line in Figure \ref{fig:sim}) is the stage completion time with Spark default scheduling algorithm. And then we remove the shuffle read time of each task, and run the simulation under three different schemes: random mapping, Spark FIFO, and our heuristic MinHeap.
-Note that most of the traces from OpenCloud is shuffle-light workload as shown in Figure \ref{fig:cdf}. The average shuffle read time is 3.2\% of total reduce completion time.
+\hlyellow{
+The simplest way of pre-scheduling is mapping tasks to different nodes randomly and evenly. 
+In order to evaluate the effectiveness of random mapping, we use traces from OpenCloud \footnote{\label{fn:trace}http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html} for the simulation.
+}
+Note that most of the traces from OpenCloud is shuffle-light workload as shown in Figure \ref{fig:cdf}. 
+The average shuffle read time is 3.2\% of total reduce completion time.
 
-Random mapping works well when there is only one round of tasks. But the performance collapses as the round number grows. It is because that data skew commonly exists in data-parallel computing \cite{skewtune, reining, gufler2012load}. Several heavy tasks might be assigned on the same node. This collision then slows down the whole stage and makes the performance even worse than the baseline. In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which might introduces extra network traffic in cluster.
+As shown in Figure \ref{fig:sim}, the baseline (i.e., red dot line) is the stage completion time with Spark FIFO scheduling algorithm. 
+And then we remove the shuffle read time of each task, and run the simulation under three different schemes: random mapping, Spark FIFO, and our heuristic MinHeap.
+Random mapping works well when there is only one round of tasks. 
+But the performance collapses as the round number grows. 
+It is because that data skew commonly exists in data-parallel computing \cite{skewtune, reining, gufler2012load}. 
+\hlyellow{
+Several heavy tasks might be assigned on the same node, thus slowing down the whole stage. 
+In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which might introduces extra network traffic in cluster.
+}
 
 \begin{figure*}
 	\centering
@@ -84,17 +122,61 @@ Random mapping works well when there is only one round of tasks. But the perform
 	\end{subfigure}
 	\caption{Reduction Distribution Prediction}
 	\label{fig:dis}
+	\vspace{-1em}
 \end{figure*}
 
 \subsubsection{Shuffle Output Prediction}\label{shuffleprediction}
-The problem of random mapping was obviously caused by application context (e.g., shuffle data size) unawareness. Note that the optimal schedule decision can be made under the awareness of shuffle dependencies number, partition number, and shuffle size for each partition. The first two of them can be easily extracted from DAG information. The scheduling can be made with the "prediction" of shuffle size.
+\ifrevision
+\marginnote{60E}
+\fi
+\hlyellow{
+The problem of random mapping was obviously caused by application context (e.g., shuffle data size) ignorance. 
+Note that a balanced schedule decision can be made under the awareness of the number of shuffle dependencies, the number of shuffle data blocks, and the size of each block. 
+The number of shuffle dependencies can be easily extracted from DAG information. 
+The number of shuffle data blocks equals the number of map tasks $\times$ the number of reduce tasks, which can also be inferred from DAG.
+So the pre-scheduling can be made if the "prediction" of size of shuffle block is practical.
+}
+% \hlyellow{
+% The shuffle size of each reduce task is decided by input data, map task computation, and hash partitioner. 
+% Each map task produces a data block for each reduce task. 
+% }
+The size of each reduce partition can be calculated $reduceSize_i = \sum_{j=0}^{m} {BlockSize_{ji}}$ ($m$ is the number of map tasks). 
+$BlockSize_{ji}$ represents the size of block which is produced by map $task_j$ for reduce $task_i$ (e.g., block `1-1' in Figure \ref{fig:shuffle}).
 
-According to the DAG computing process, the shuffle size of each reduce task is decided by input data, map task computation, and hash partitioner. Each map task produces a data block for each reduce task. The size of each reduce partition can be calculated $reduceSize_i = \sum_{j=0}^{m} {BlockSize_{ji}}$ ($m$ is the number of map tasks). $BlockSize_{ji}$ represents the size of block which is produced by map $task_j$ for reduce $task_i$ (e.g., block `1-1' in Figure \ref{fig:shuffle}).
+For the most DAG applications with random large scale input, 
+the $BlockSize_{ji}$ can be predicted with decent accuracy by liner regression model (i.e., equation \ref{linearregresion}) based on observation that the ratio of map output size and input size are invariant given the same job configuration \cite{ishuffle, predict}.
+\begin{equation}
+\label{linearregresion}
+\begin{aligned}
+	BlockSize_{ji} = k \times inputSize_j + b
+\end{aligned}
+\end{equation}
+\hlyellow{
+The $k$ and $b$ can be determined using the observed $inputSize_j$ of $j$th map task and $BlockSize_{ji}$.
+}
 
-For the simple DAG applications such as Hadoop MapReduce \cite{mapreduce}, the $BlockSize_{ji}$ can be predicted with decent accuracy by liner regression model based on observation that the ratio of map output size and input size are invariant given the same job configuration \cite{ishuffle, predict}.
+\hlyellow{
+Though the linear regression is stable in most scenarios, it can failed in some uncertainties introduced by the sophisticated frameworks like Spark} \cite{apachespark}.  
+\hlyellow{
+For instance, the customized partitioner might bring large inconsistency between observed map output blocks distribution and the final shuffle data distribution. 
+}
+\ifrevision
+\reversemarginpar
+\marginnote{60B}
+\fi
+We present two particular examples in Figure \ref{fig:hash_pre} and Figure \ref{fig:range_pre_sample}. 
+In Figure \ref{fig:hash_pre}, we use a random input dataset with the hash partitioner. 
+In Figure \ref{fig:range_pre_sample}, we use the data distribution of second that are partitioned by Spark RangePartitioner \cite{apachespark} shuffle of Spark Terasort \cite{spark-tera}. 
+All of the numbers in both figures are normalized the distribution to $0-1$ to fit in one figure. 
+% In Figure \ref{fig:hash_pre} and Figure \ref{fig:range_pre_sample}, we use different datasets with different partitioners, and normalize the distribution to $0-1$ to fit in one figure. 
+The observed map outputs are randomly picked. 
+As we can see, Figure \ref{fig:hash_pre}, the distribution of observed map output is close to the final reduce input distribution. 
+The prediction results also turn out to be good. 
+\hlyellow{
+However, the inconsistency in Figure} \ref{fig:range_pre_sample} \hlyellow{results in a deviation in linear regression model. 
+It is because the RangePartitioner leads to an extreme high locality skew. 
+That is, for one reduce tasks, almost all of the input date are produced by a particular map task (e.g., the observed map only produces data for reduce tasks 0-5 in Figure} \ref{fig:fig:range_pre_sample}).
 
-But the sophisticated DAG computing frameworks like Spark introduce more uncertainties. For instance, the customized partitioner might bring large inconsistency between observed map output blocks distribution and the final shuffle data distribution. In Figure \ref{fig:dis}, we use different datasets with different partitioners, and normalize the distribution to $0-1$ to fit in one figure. In Figure \ref{fig:hash_pre}, we use a random input dataset with the hash partitioner. In Figure \ref{fig:range_pre_sample}, we use a skew dataset with the range partitioner of Spark \cite{apachespark}.
-The observed map outputs are randomly picked. As we can see, in hash partitioner, the distribution of observed map output is close to the final reduce input distribution. The prediction results also turn out to be good. However, this inconsistency results in a deviation in linear regression model.
 % Several map outputs (marked as Map Output in Figure \ref{fig:shuffle}) are picked as observation objects to train the model and than predict the final reduce distribution.
 To handle this inconsistency, we introduce another methodology named weighted reservoir sampling. The $BlockSize_{ji}$ can be calculated by
 \begin{equation}

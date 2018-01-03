@@ -1,12 +1,6 @@
 \section{Implementation}\label{impl}
 This section presents an overview of the implementation of SCache -- an open source cross-framework shuffle data management system with a DAG co-scheduler. Here we use Spark as an example of DAG framework to illustrate the work flow of shuffle optimization. We will first present the system overview in Subsection \ref{arch} while the following two subsections focus on the two constraints on memory management.
 
-\subsection{System Overview}\label{arch}
-SCache consists of three components: a distributed shuffle data management system, a DAG co-scheduler, and a daemon inside Spark. As shown in Figure \ref{fig:arch}, SCache employs the legacy master-slaves architecture like GFS \cite{gfs} for shuffle data management system. 
-The master node of SCache coordinates the shuffle blocks globally with application context. The worker node reserves memory to store blocks.
-The coordination provides two guarantees: (a)data is stored in memory before tasks start and (b)data is scheduled on-off memory with all-or-nothing and context-aware constraints. 
-The daemon bridges the communication between Spark and SCache. The co-scheduler is dedicated to pre-schedule reduce tasks with DAG information and enforce the scheduling results to Spark scheduler.
-
 \begin{minipage}{\columnwidth}
 \begin{algorithm}[H]
 \caption{Heuristic MinHeap Scheduling for Single Shuffle}
@@ -92,6 +86,12 @@ The daemon bridges the communication between Spark and SCache. The co-scheduler 
 	\end{algorithmic}
 \end{algorithm}
 \end{minipage}
+
+\subsection{System Overview}\label{arch}
+SCache consists of three components: a distributed shuffle data management system, a DAG co-scheduler, and a daemon inside Spark. As shown in Figure \ref{fig:arch}, SCache employs the legacy master-slaves architecture like GFS \cite{gfs} for shuffle data management system. 
+The master node of SCache coordinates the shuffle blocks globally with application context. The worker node reserves memory to store blocks.
+The coordination provides two guarantees: (a)data is stored in memory before tasks start and (b)data is scheduled on-off memory with all-or-nothing and context-aware constraints. 
+The daemon bridges the communication between Spark and SCache. The co-scheduler is dedicated to pre-schedule reduce tasks with DAG information and enforce the scheduling results to Spark scheduler.
 
 When a Spark job starts, the DAG will be first generated. 
 During the DAG generation, the shuffle dependencies among Resilient Distributed Datasets (RDDs) will then be submitted through the daemon process in Spark driver. The SCache master recognizes all shuffle dependencies in a RPC call as a shuffle scheduling unit.

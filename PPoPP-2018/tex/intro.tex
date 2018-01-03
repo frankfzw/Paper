@@ -111,7 +111,7 @@ Firstly, the complexity of DAG can amplify the defects of na\"{i}ve pre-scheduli
 In particular, randomly assign reduce tasks might result in a collision of two heavy tasks on one node. 
 This collision can aggravate data skew, thus hurting the performance. 
 Secondly, pre-scheduling without launching violates the design of most frameworks that launches a task after scheduling.
-To address the challenges, we propose a heuristic reduce tasks pre-scheduling scheme with shuffle data predict and a tasks co-scheduler} (Section \ref{opt}).
+To address the challenges, we propose a heuristic reduce tasks pre-scheduling scheme with shuffle data prediction and a tasks co-scheduler} (Section \ref{opt}).
 
 Another challenge is the \textit{in-memory data management}. 
 To prevent shuffle data touching the disk, SCache leverages extra memory to store the shuffle data. 
