@@ -72,6 +72,8 @@ On the reduce side, the network transfer of shuffle data introduces an explicit 
 Meanwhile, shuffle is I/O intensive. 
 Both shuffle write and shuffle read occupy the slot without involving much CPU as presented in Figure \ref{fig:util}. 
 The current coarse slot --- task mapping results in an inconsistency between resource demands and slot allocation thus decreases the resource utilization. 
+\hlyellow{
+Note that this defect exists in not only Spark} \cite{apachespark}, but also Hadoop MapReduce \cite{hadoop} and Apache Tez \cite{tez}. 
 To break this inconsistency, a finer granularity resource allocation scheme must be provided.
 
 \subsubsection{Synchronized Shuffle Read}
@@ -81,16 +83,23 @@ As shown in Figure \ref{fig:util},
 \hlyellow{
 the data transfer put a great deal of stress on network bandwidth, which may results in network congestion and further slows down the network transfer.
 }
+\hlyellow{
+It also happens in other frameworks that follow Bulk Synchronous Parallel (BSP) paradigm, such as} Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc.
 % The previous work \cite{coflow, managing} also proves that the network transfer can introduce significant overhead in DAG computing.
 
 \subsubsection{Inefficient Persistent Storage Operation}
-At first, both shuffle write and read are tightly coupled with task execution, which results in a blocking style I/O operation. 
+At first, both shuffle write and read are tightly coupled with task execution, which results in a blocking I/O operation. 
 This blocking I/O operation along with synchronized shuffle read may introduce significant latency, especially in a I/O performance bounded cluster.
 Besides, the legacy of \hlyellow{storing} shuffle data on disk is too conservative in modern cluster with large memory. 
 Compared to input dataset, the size of shuffle data is relatively small. 
 For example, shuffle size of Spark Terasort \cite{spark-tera} is less than 25\% of input data. 
 The data reported in \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as 10\%-20\%. 
 On the other hand, numbers of memory based distributed storage system have been proposed \cite{memcached, tachyon, ramcloud} to move data back to memory. 
+\ifrevision
+\marginnote{60D}
+\fi
+\hlyellow{
+Unfortunately, most of the DAG frameworks still store shuffle data on disks }(e.g., Spark \cite{apachespark}, Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc).
 We argue that the memory capacity is large enough to store the short-living shuffle data with cautious management.
 
 \ifrevision
@@ -108,7 +117,10 @@ At the same time, the network is idle during the map stage (network utilization 
 If the destination host of the shuffle data can be predicted in priori, the property of multi-round can be leveraged to overlap the shuffle read operation.
 % There are at least two persistent storage operations for each shuffle data block. At first, Spark will write shuffle data to the persistent storage after map task execution (i.e. \textit{shuffle write} in Figure \ref{fig:util}). During the \textit{shuffle read}, Spark will read shuffle data from remote and local persistent storage, which is the second operation. The persistence of shuffle data was designed for fault tolerance. But we believe it is not necessary for today's cluster. Recall that shuffle data only exist in a short time scale. But the Mean Time To Failure (MTTF) for a server is counted in the scale of year \cite{tachyon}, which is exponential compared with the duration of a shuffle. In addition, the capacity of memory and network has been increasing rapidly in recent years. As a result, numbers of memory based distributed storage system have been proposed \cite{memcached, tachyon, ramcloud}. On the other hand, the size of shuffle data is relatively small. For example, shuffle size of Spark Terasort \cite{spark-tera} is less than 25\% of input data. The data reported in  \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as 10\%-20\%. We argue that removing persistent storage and using memory to achieve shuffle fault tolerance is feasible and efficient.
 
-Based on these observations, it is straightforward to come up with an optimization that starts shuffle read ahead of reduce stage to overlap the I/O operations in multi-round DAG computing tasks, and uses memory to store the shuffle data for further optimization. 
+\hlyellow{
+Based on these observations, most of the DAG frameworks share the execution paradigm as well as the defects of shuffle process. 
+To mitigate the shuffle overhead, we propose an optimization that starts shuffle read ahead of reduce stage to overlap the I/O operations in multi-round DAG computing tasks, and uses memory to store the shuffle data. 
+}
 To achieve this optimization:
 \begin{itemize}
 	\item Shuffle process should be decoupled from task execution to achieve a fine granularity scheduling scheme.

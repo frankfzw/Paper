@@ -1,6 +1,3 @@
-\section{Implementation}\label{impl}
-This section presents an overview of the implementation of SCache -- an open source cross-framework shuffle data management system with a DAG co-scheduler. Here we use Spark as an example of DAG framework to illustrate the work flow of shuffle optimization. We will first present the system overview in Subsection \ref{arch} while the following two subsections focus on the two constraints on memory management.
-
 \begin{minipage}{\columnwidth}
 \begin{algorithm}[H]
 \caption{Heuristic MinHeap Scheduling for Single Shuffle}
@@ -9,21 +6,21 @@ This section presents an overview of the implementation of SCache -- an open sou
 	\small
 	\Procedure{\Large schedule}{$m, host\_ids, p\_reduces$}
 		\State $m\gets$ partition number of map tasks
-		\State $R\gets$ sort $p\_reduces$ by size in descending order
+		\State $R\gets$ sort $p\_reduces$ by size in non-increasing order
 		\State $M\gets$ min-heap $\left\{ host\_id \rightarrow \left( \left[ reduces \right], size \right) \right\}$
-		\State $idx\gets$ len$\left(R\right) - 1$
-		\While{$idx \geq 0$}
-		\Comment{Schedule reduces by MinHeap}
+		\State $idx\gets 0$
+		\While{$idx <$ len$R$}
+		% \Comment{Schedule reduces by MinHeap}
 		\State $M\left[0\right].size \mathrel{+}= R\left[idx\right].size$
 		\State $M\left[0\right].reduces.append\left(R\left[idx\right]\right)$
-		\State $R\left[idx\right].assigned\_host \gets M \left[0\right].host\_id$
+		\State $R\left[idx\right].assigned\_id \gets M \left[0\right].host\_id$
 		\State Sift down $M\left[0\right]$ by $size$
 		\State $idx\gets idx-1$
 		\EndWhile
 		\State $max\gets$ maximum size in $M$
-		\State Convert $M$ to mapping $\left\{ host\_id \rightarrow \left( \left[ rid\_arr \right], size \right) \right\}$
+		% \State Convert $M$ to mapping $\left\{ host\_id \rightarrow \left( \left[ rid\_arr \right], size \right) \right\}$
 		\ForAll{$reduce$ in $R$}
-		\Comment{Heuristic swap by locality}
+		\Comment{Heuristic locality swap}
 			\If{$reduce.assigned\_id \neq reduce.host\_id$}
 				\State $p\gets reduce.prob$
 				\State $norm\gets \left(p-1/m\right)/\left(1-1/m\right)/10$
@@ -39,17 +36,21 @@ This section presents an overview of the implementation of SCache -- an open sou
 		\Return $M$
 	\EndProcedure
 	\Procedure{\Large swap\_tasks}{$M, reduce, upper\_bound$}
-		\State $reduces \gets M\left[reduce.host\_id\right].reduce$	
-		\State $candidates \gets$ Select from $reduces$ that $assigned\_id \neq host\_id$ \textbf{and} total size closest to $reduce.size$
-		\State $\Delta size \gets sizeOf\left(candidates\right) - reduce.size$
-		\State $size\_host \gets M\left[reduce.host\_id\right].size - \Delta size$
-		\State $size\_assigned \gets M\left[reduce.assigned\_id\right].size + \Delta size$
-		\If{$size\_host\leq upper\_bound$ \textbf{and} \\
-			\qquad \; $size\_assigned\leq upper\_bound$}
-			\State Swap $candidates$ and $reduce$
-			\State Update $size$ in $M$
-			\State Update $assigned\_host$ in $candidates$ and $reduce$
-		\EndIf
+		\State Swap tasks between node $host\_id$ and node $assigned\_id$
+		\State of $reduce$ without exceeding the $upper\_bound$
+		\State of both nodes.
+		\State Return if it is impossible.
+		% \State $reduces \gets M\left[reduce.host\_id\right].reduce$	
+		% \State $candidates \gets$ Select from $reduces$ that $assigned\_id \neq host\_id$ \textbf{and} total size closest to $reduce.size$
+		% \State $\Delta size \gets sizeOf\left(candidates\right) - reduce.size$
+		% \State $size\_host \gets M\left[reduce.host\_id\right].size - \Delta size$
+		% \State $size\_assigned \gets M\left[reduce.assigned\_id\right].size + \Delta size$
+		% \If{$size\_host\leq upper\_bound$ \textbf{and} \\
+		% 	\qquad \; $size\_assigned\leq upper\_bound$}
+		% 	\State Swap $candidates$ and $reduce$
+		% 	\State Update $size$ in $M$
+		% 	\State Update $assigned\_host$ in $candidates$ and $reduce$
+		% \EndIf
 	\EndProcedure
 	\end{algorithmic}
 \end{algorithm}
@@ -66,8 +67,9 @@ This section presents an overview of the implementation of SCache -- an open sou
 		\Comment $shuffles$ is the previous schedule result 
 		\ForAll{$r$ in $p\_reduces$}
 			\State $r.size \mathrel{+}= shuffles\left[r.rid\right].size$
-			\If{$shuffles\left[r.rid\right].size\geq r.size \times r.prob$}
-				\State $r.prob\gets shuffles\left[r.rid\right].size / r.size$
+			\State $new\_prob\gets shuffles\left[r.rid\right].size / r.size$
+			\If{$new\_prob\geq r.prob$}
+				\State $r.prob\gets new\_prob$
 				\State $r.host\_id\gets shuffles\left[r.rid\right].assigned\_host$
 			\EndIf
 		\EndFor
@@ -86,6 +88,9 @@ This section presents an overview of the implementation of SCache -- an open sou
 	\end{algorithmic}
 \end{algorithm}
 \end{minipage}
+
+\section{Implementation}\label{impl}
+This section presents an overview of the implementation of SCache -- an open source cross-framework shuffle data management system with a DAG co-scheduler. Here we use Spark as an example of DAG framework to illustrate the work flow of shuffle optimization. We will first present the system overview in Subsection \ref{arch} while the following two subsections focus on the two constraints on memory management.
 
 \subsection{System Overview}\label{arch}
 SCache consists of three components: a distributed shuffle data management system, a DAG co-scheduler, and a daemon inside Spark. As shown in Figure \ref{fig:arch}, SCache employs the legacy master-slaves architecture like GFS \cite{gfs} for shuffle data management system. 
