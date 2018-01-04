@@ -27,14 +27,7 @@ Shuffle write starts at the end of map tasks. The shuffle data produced by map t
 Shuffle read starts at the beginning of reduce tasks. The data consumed by reduce tasks will be fetched from remote storage during shuffle read.
 }
 
-\begin{figure}
-	\includegraphics[width=\linewidth]{fig/util}
-	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
-	\label{fig:util}
-	\vspace{-1em}
-\end{figure}
 %In short, shuffle is loosely coupled with application context and it's I/O intensive.
-
 \textbf{Impact of shuffle process}. Shuffle is I/O intensive, which might introduces a significant latency to the application. 
 Reports show that 60\% of MapReduce jobs at Yahoo! and 20\% at Facebook are shuffle intensive workloads \cite{shufflewatcher}. 
 For those shuffle intensive jobs, the shuffle latency may even dominate Job Completion Time (JCT).
@@ -42,13 +35,12 @@ For instance, a MapReduce trace analysis from Facebook shows that shuffle accoun
 % Besides, the completion time of shuffle correlates with the performance of storage devices, network and even applications.
 % This variation may bring a huge challenge for operators to find the correct configuration of the DAG framework.
 
-
 \subsection{Observations} \label{observation}
 Of course, shuffle is unavoidable in a DAG computing process. 
 But can we mitigate or even remove the overhead of shuffle? 
 \hlyellow{
 To find the answers, we run some typical Spark applications in a 5-node \texttt{m4.xlarge} EC2 cluster.
-Besides, we also analyze the design and implementation of shuffle in some open source frameworks.
+Besides, we analyze the design and implementation of shuffle in other DAG frameworks.
 }
 Here we present the hardware utilization trace of one node running Spark \textit{GroupByTest} in Figure \ref{fig:util} as an example. 
 This job has 2 rounds of tasks for each node.
@@ -57,15 +49,16 @@ The \textit{execution} phase is marked from the launch time of the first task to
 The \textit{shuffle write} phase is marked from the beginning of the first shuffle write in a task. 
 The \textit{shuffle read and execution} phase is marked from the launch time of the first reduce.
 }
-
 % Figure \ref{fig:util} reveals the performance information of two stages that are connected by shuffle. By analyzing the trace with Spark source code \cite{sparksource}, we propose the following observations.
 % \begin{figure*}
 % 	\includegraphics[width=\textwidth]{fig/util}
 % 	\caption{CPU utiliazation and I/O throughput of a node during a Spark single shuffle application}
 % 	\label{fig:util}
 % \end{figure*}
-
-
+\ifrevision
+\reversemarginpar
+\marginnote{60B,C,D,E,F}
+\fi
 \subsubsection{Coarse Granularity Resource Allocation}
 In Figure \ref{fig:util}, when a slot is assigned to a task, it will not be released until the the task completes shuffle write. 
 On the reduce side, the network transfer of shuffle data introduces an explicit I/O delay during shuffle read. 
@@ -81,11 +74,18 @@ Almost all reduce tasks start shuffle read simultaneously.
 The synchronized shuffle read requests cause a burst of network traffic. 
 As shown in Figure \ref{fig:util}, 
 \hlyellow{
-the data transfer put a great deal of stress on network bandwidth, which may results in network congestion and further slows down the network transfer.
+the data transfer puts a great deal of stress on network bandwidth, which may results in network congestion and further slows down the network transfer.
 }
 \hlyellow{
 It also happens in other frameworks that follow Bulk Synchronous Parallel (BSP) paradigm, such as} Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc.
 % The previous work \cite{coflow, managing} also proves that the network transfer can introduce significant overhead in DAG computing.
+
+\begin{figure}
+	\includegraphics[width=\linewidth]{fig/util}
+	\caption{CPU utilization and I/O throughput of a node during a Spark single shuffle application}
+	\label{fig:util}
+	\vspace{-1em}
+\end{figure}
 
 \subsubsection{Inefficient Persistent Storage Operation}
 At first, both shuffle write and read are tightly coupled with task execution, which results in a blocking I/O operation. 
@@ -95,21 +95,20 @@ Compared to input dataset, the size of shuffle data is relatively small.
 For example, shuffle size of Spark Terasort \cite{spark-tera} is less than 25\% of input data. 
 The data reported in \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as 10\%-20\%. 
 On the other hand, numbers of memory based distributed storage system have been proposed \cite{memcached, tachyon, ramcloud} to move data back to memory. 
-\ifrevision
-\marginnote{60D}
-\fi
+
 \hlyellow{
 Unfortunately, most of the DAG frameworks still store shuffle data on disks }(e.g., Spark \cite{apachespark}, Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc).
 We argue that the memory capacity is large enough to store the short-living shuffle data with cautious management.
 
-\ifrevision
-\marginnote{60E}
-\fi
 \subsubsection{Multi-round Tasks Execution}\label{multi}
 Both experience and DAG framework manuals recommend that multi-round execution of each stage will benefit the performance of applications.
 \hlyellow{
 That is, for a cluster with $n$ number of slots, the number of tasks should be $n \times k (k \geq 1)$. 
 }
+\ifrevision
+\reversemarginpar
+\marginnote{60E}
+\fi
 For example, Hadoop MapReduce Tutorial \cite{hadooptutorial} suggests that \textit{10-100 maps} per-node and \textit{0.95 or 1.75 $\times$ no. of nodes $\times$ no. of maximum container reduces} per-node seem to be the right level of parallelism. 
 Spark Configuration also recommends $2-3$ tasks per CPU core \cite{sparkconf}.
 Since the shuffle data becomes available as soon as the end of map task execution. 

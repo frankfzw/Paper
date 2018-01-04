@@ -2,7 +2,7 @@
 \label{opt}
 This section presents the detailed methodologies to achieve three design goals. 
 The out-of-framework shuffle data management is used to decouple shuffle from execution and provide a cross-framework optimization. 
-Two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}) and \hlyellow{a co-scheduler} are used to achieve shuffle data pre-fetching without launching tasks.
+Two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}) and \hlyellow{a co-scheduler} is used to achieve shuffle data pre-fetching without launching tasks.
 
 \subsection{Decouple Shuffle from Execution}
 To achieve the decouple from map tasks and reduce tasks, the original shuffle write and read implementation in the current frameworks should be modified to apply the API of SCache.
@@ -22,10 +22,22 @@ Instead, the original implementation of shuffle read will trigger a network tran
 \reversemarginpar
 \marginnote{60C}
 \fi
+%To this end, all I/O operations are managed outside of the DAG framework, and the slot is occupied only by the CPU intensive phases of task.
+\subsection{Pre-schedule with Application Context}
+\hlyellow{
+The pre-scheduling and pre-fetching are the most critic steps toward the optimization. 
+The task -- node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. 
+Once the tasks are scheduled, the slots will be occupied to launch them. 
+On the other hand, the shuffle data cannot be pre-fetched without the awareness of task -- node mapping.
+}
+To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}). 
+\hlyellow{
+That is, the task -- node mapping is established ahead of the task scheduling, and then it is enforced to the DAG scheduler when the task scheduling starts.
+}
 
 \begin{figure}
 	\centering
-	\includegraphics[width=0.6\linewidth]{fig/reduce_cdf}
+	\includegraphics[width=0.5\linewidth]{fig/reduce_cdf}
 	\caption{Shuffle Time Fraction CDF of OpenCloud Trace}
 	\label{fig:cdf}
 	\vspace{-1em}
@@ -39,26 +51,6 @@ Instead, the original implementation of shuffle read will trigger a network tran
 	\vspace{-1em}
 \end{figure}
 
-%To this end, all I/O operations are managed outside of the DAG framework, and the slot is occupied only by the CPU intensive phases of task.
-\subsection{Pre-schedule with Application Context}
-\hlyellow{
-The pre-scheduling and pre-fetching the most critic steps toward the optimization. 
-The task --- node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. 
-Once the tasks are scheduled, the slots will be occupied to launch them. 
-On the other hand, the shuffle data cannot be pre-fetched without the awareness of task --- node mapping.
-}
-To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}). 
-\hlyellow{
-That is, the task --- node mapping is established ahead of the task scheduling, and then it is enforced to the DAG scheduler when the task scheduling starts.
-}
-
-\begin{figure}
-	\centering
-	\includegraphics[width=0.9\linewidth]{fig/shuffle}
-	\caption{Shuffle Data Prediction}
-	\label{fig:shuffle}
-	\vspace{-1em}
-\end{figure}
 % We explore several pre-scheduling schemes in different scenarios, and evaluate the performance calculating the improvement of reduce tasks completion time with trace of OpenCloud \cite{opencloudtrace}. We first emulate the scheduling algorithm of Spark to schedule the reduce tasks of one job, and take the bottleneck of the task set as the completion time. Then we remove the shuffle read time as the assumption of shuffle data pre-fetch and emulate under different schemes. The result is shown in \ref{fig:sim}.
 % \begin{figure*}
 % 	\centering
@@ -101,30 +93,8 @@ But the performance collapses as the round number grows.
 It is because that data skew commonly exists in data-parallel computing \cite{skewtune, reining, gufler2012load}. 
 \hlyellow{
 Several heavy tasks might be assigned on the same node, thus slowing down the whole stage. 
-In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which might introduces extra network traffic in cluster.
+In addition, randomly assigned tasks also ignore the data locality between shuffle map output and shuffle reduce input, which might introduce extra network traffic in cluster.
 }
-
-\begin{figure*}
-	\centering
-	\begin{subfigure}[b]{0.32\linewidth}
-		\includegraphics[width=\linewidth]{fig/hash_pre}
-		\caption{Linear Regression Prediction of Hash Partitioner}
-		\label{fig:hash_pre}
-	\end{subfigure}
-	\begin{subfigure}[b]{0.32\linewidth}
-		\includegraphics[width=\linewidth]{fig/range_pre_sample}
-		\caption{Linear Regression and Sampling Prediction of Range Partitioner}
-		\label{fig:range_pre_sample}
-	\end{subfigure}
-	\begin{subfigure}[b]{0.32\linewidth}
-		\includegraphics[width=\linewidth]{fig/prediction_relative_error}
-		\caption{Prediction Relative Error of Range Partitioner}
-		\label{fig:prediction_relative_error}
-	\end{subfigure}
-	\caption{Reduction Distribution Prediction}
-	\label{fig:dis}
-	\vspace{-1em}
-\end{figure*}
 
 \subsubsection{Shuffle Output Prediction}\label{shuffleprediction}
 \ifrevision
@@ -132,11 +102,20 @@ In addition, randomly assigned tasks also ignore the data locality between shuff
 \fi
 \hlyellow{
 The problem of random mapping was obviously caused by application context (e.g., shuffle data size) ignorance. 
-Note that a balanced schedule decision can be made under the awareness of the number of shuffle dependencies, the number of shuffle data blocks, and the size of each block. 
+Note that a balanced schedule decision can be made under the consideration of the number of shuffle dependencies, the number of shuffle data blocks, and the size of each block. 
 The number of shuffle dependencies can be easily extracted from DAG information. 
 The number of shuffle data blocks equals the number of map tasks $\times$ the number of reduce tasks, which can also be inferred from DAG.
 So the pre-scheduling can be made if the "prediction" of size of shuffle block is practical.
 }
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{fig/shuffle}
+	\caption{Shuffle Data Prediction}
+	\label{fig:shuffle}
+	\vspace{-1em}
+\end{figure}
+
 % \hlyellow{
 % The shuffle size of each reduce task is decided by input data, map task computation, and hash partitioner. 
 % Each map task produces a data block for each reduce task. 
@@ -156,15 +135,16 @@ the $BlockSize_{ji}$ can be predicted with decent accuracy by liner regression m
 The $k$ and $b$ can be determined using the observed $inputSize_j$ of $j$th map task and $BlockSize_{ji}$.
 }
 
-\hlyellow{
-Though the linear regression is stable in most scenarios, it can failed in some uncertainties introduced by the sophisticated frameworks like Spark} \cite{apachespark}.  
-\hlyellow{
-For instance, the customized partitioner might bring large inconsistency between observed map output blocks distribution and the final shuffle data distribution. 
-}
 \ifrevision
 \reversemarginpar
 \marginnote{60D}
 \fi
+
+\hlyellow{
+Though the linear regression is stable in most scenarios, it can fail in some uncertainties introduced by the sophisticated frameworks like Spark} \cite{apachespark}.  
+\hlyellow{
+For instance, the customized partitioner might bring large inconsistency between observed map output blocks distribution and the final shuffle data distribution. 
+}
 We present two particular examples in Figure \ref{fig:hash_pre} and Figure \ref{fig:range_pre_sample}. 
 All of the data in both figures are normalized to $0-1$ to fit in one figure. 
 % In Figure \ref{fig:range_pre_sample}, we use the distribution of second shuffle of Spark Terasort \cite{spark-tera} that are partitioned by Spark RangePartitioner \cite{apachespark}. 
@@ -176,7 +156,7 @@ The prediction results also turn out to be good.
 However, the data partitioned by Spark RangePartitioner} \cite{apachespark} in Figure \ref{fig:range_pre_sample} \hlyellow{results in a deviation in linear regression model. }
 \hlyellow{
 It is because the RangePartitioner might introduce an extreme high data locality skew. 
-That is, for one reduce task, almost all of the input date are produced by a particular map task (e.g., the observed map tasks only produce data for reduce tasks 0-5 in Figure} \ref{fig:fig:range_pre_sample}).
+That is, for one reduce task, almost all of the input date are produced by a particular map task (e.g., the observed map tasks only produce data for reduce tasks 0-5 in Figure} \ref{fig:range_pre_sample}).
 \hlyellow{
 The data locality skew results in a missing of other reduce tasks' data in the observed map outputs.
 }
@@ -221,25 +201,44 @@ During the shuffle output prediction, the composition of each reduce partition i
 This parameter is used to achieve a better data locality while performing shuffle pre-scheduling. 
 }
 
+\begin{figure*}
+	\centering
+	\begin{subfigure}[b]{0.32\linewidth}
+		\includegraphics[width=\linewidth]{fig/hash_pre}
+		\caption{Linear Regression Prediction of Hash Partitioner}
+		\label{fig:hash_pre}
+	\end{subfigure}
+	\begin{subfigure}[b]{0.32\linewidth}
+		\includegraphics[width=\linewidth]{fig/range_pre_sample}
+		\caption{Linear Regression and Sampling Prediction of Range Partitioner}
+		\label{fig:range_pre_sample}
+	\end{subfigure}
+	\begin{subfigure}[b]{0.32\linewidth}
+		\includegraphics[width=\linewidth]{fig/prediction_relative_error}
+		\caption{Prediction Relative Error of Range Partitioner}
+		\label{fig:prediction_relative_error}
+	\end{subfigure}
+	\caption{Reduction Distribution Prediction}
+	\label{fig:dis}
+	\vspace{-1em}
+\end{figure*}
+
 \subsubsection{Heuristic MinHeap Scheduling}\label{h-minheap}
+
+\ifrevision
+\marginnote{60D,E}
+\fi
 
 \hlyellow{
 As long as the input sizes of reduce tasks are available, the pre-scheduling is a classic scheduling problem without considering the data locality. 
 }
-\ifrevision
-\reversemarginpar
-\marginnote{60E}
-\fi
 \hlyellow{
-But as we mentioned before, the ignorance of data locality can introduce extra network transfer, especially in the extreme data locality case (e.g., Figure} \ref{fig:fig:range_pre_sample}). 
+But as we mentioned before, the ignorance of data locality can introduce extra network transfer (e.g., Figure} \ref{fig:range_pre_sample}). 
 \hlyellow{
 In order to balance load on each node while reducing the network traffic, we present a heuristic MinHeap scheduling algorithm (Algorithm} \ref{hminheap}).   
-\ifrevision
-\reversemarginpar
-\marginnote{60D}
-\fi
+
 \hlyellow{
-For the pre-scheduling itself(i.e., the first $while$), algorithm maintains a min-heap to simulate the load of each node 
+For the pre-scheduling itself (i.e., the first $while$), the algorithm maintains a min-heap to simulate the load of each node 
 and applies the longest processing time rule (LPT)} \cite{design}\hlyellow{ to achieve $4/3-approximation$ optimum. }
 \hlyellow{
 Since the size of tasks are considered while scheduling, Heuristic MinHeap can achieve shorter makespan than Spark FIFO which is a $2-approximation$ optimum. 
@@ -255,6 +254,63 @@ The normalized probability $norm$ is calculated as a bound of performance degrad
 Inside the $SWAP\_TASKS$, tasks will be selected and swapped without exceeding the $upper\_bound$ of each host. 
 }
 
+\begin{minipage}{\columnwidth}
+\begin{algorithm}[H]
+\caption{Heuristic MinHeap Scheduling for Single Shuffle}
+\label{hminheap}
+	\begin{algorithmic}[1]
+	\small
+	\Procedure{\Large schedule}{$m, host\_ids, p\_reduces$}
+		\State $m\gets$ partition number of map tasks
+		\State $R\gets$ sort $p\_reduces$ by size in non-increasing order
+		\State $M\gets$ min-heap $\left\{ host\_id \rightarrow \left( \left[ reduces \right], size \right) \right\}$
+		\State $idx\gets 0$
+		\While{$idx <$ len$R$}
+		% \Comment{Schedule reduces by MinHeap}
+		\State $M\left[0\right].size \mathrel{+}= R\left[idx\right].size$
+		\State $M\left[0\right].reduces.append\left(R\left[idx\right]\right)$
+		\State $R\left[idx\right].assigned\_id \gets M \left[0\right].host\_id$
+		\State Sift down $M\left[0\right]$ by $size$
+		\State $idx\gets idx-1$
+		\EndWhile
+		\State $max\gets$ maximum size in $M$
+		% \State Convert $M$ to mapping $\left\{ host\_id \rightarrow \left( \left[ rid\_arr \right], size \right) \right\}$
+		\ForAll{$reduce$ in $R$}
+		\Comment{Heuristic locality swap}
+			\If{$reduce.assigned\_id \neq reduce.host\_id$}
+				\State $p\gets reduce.prob$
+				\State $norm\gets \left(p-1/m\right)/\left(1-1/m\right)/10$
+				\State $upper\_bound \gets \left(1 + norm\right) \times max$
+				\State SWAP\_TASKS$\left(M, reduce, upper\_bound\right)$
+			\EndIf
+		\EndFor
+		% \Comment{$m$ is the number of input data}
+		% \Comment{$r$ is partition number of reduces}
+		% \Comment{$hosts$ is array of (hostid, partitionids[], size)}
+		% \Comment{$c$ is $r*m$ array of composition data}
+		% \Comment{$pSize$ is $r$ size array of predicted size of reduces}
+		\Return $M$
+	\EndProcedure
+	\Procedure{\Large swap\_tasks}{$M, reduce, upper\_bound$}
+		\State Swap tasks between node $host\_id$ and node $assigned\_id$
+		\State of $reduce$ without exceeding the $upper\_bound$
+		\State of both nodes.
+		\State Return if it is impossible.
+		% \State $reduces \gets M\left[reduce.host\_id\right].reduce$	
+		% \State $candidates \gets$ Select from $reduces$ that $assigned\_id \neq host\_id$ \textbf{and} total size closest to $reduce.size$
+		% \State $\Delta size \gets sizeOf\left(candidates\right) - reduce.size$
+		% \State $size\_host \gets M\left[reduce.host\_id\right].size - \Delta size$
+		% \State $size\_assigned \gets M\left[reduce.assigned\_id\right].size + \Delta size$
+		% \If{$size\_host\leq upper\_bound$ \textbf{and} \\
+		% 	\qquad \; $size\_assigned\leq upper\_bound$}
+		% 	\State Swap $candidates$ and $reduce$
+		% 	\State Update $size$ in $M$
+		% 	\State Update $assigned\_host$ in $candidates$ and $reduce$
+		% \EndIf
+	\EndProcedure
+	\end{algorithmic}
+\end{algorithm}
+\end{minipage}
 \subsubsection{Cope with Multiple Shuffle Dependencies}
 \ifrevision
 \marginnote{60E}

@@ -3,7 +3,7 @@
 \reversemarginpar
 \marginnote{60D}
 \fi
-Recent years have witnessed widespread use of sophisticated frameworks such as Dryad \cite{dryad}, Spark \cite{spark}, and Apache Tez \cite{tez}.
+Recent years have witnessed widespread use of sophisticated frameworks, such as Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, Spark \cite{spark}, and Apache Tez \cite{tez}.
 \hlyellow{
 Most of them define jobs as directed acyclic graphs (DAGs), such as map-reduce pipeline in Hadoop MapReduce, lineage of resilient distributed datasets (RDD) in Spark, vertices and edges in Dryad and Tez, etc.
 }
@@ -22,7 +22,7 @@ And the \textit{shuffle read} fetches intermediate results from remote disks thr
 Once scheduled, a fixed bundle of resources (i.e., CPU, memory, disk and network) named \textit{slot} is assigned to each of the computation task, and the resources are released only after the task finishes.
 Such task aggregation together with the coarse-grained scheduling effectively simplifies task management.
 \hlyellow{
-However, since a cluster have a limited number of slots, attaching the I/O intensive shuffle phase to the CPU/memory intensive computation phase results in a poor multiplexing between computational and I/O resources.
+However, since a cluster has a limited number of slots, attaching the I/O intensive shuffle phase to the CPU/memory intensive computation phase results in a poor multiplexing between computational and I/O resources.
 }
 %The map task in Figure \ref{fig:workflow} well explains such deficiency: the I/O resource allocated to the stage is always idle during the computation time, and the computation/memory resource is totally wasted during the shuffle write attached to it, and vice versa.
 \begin{figure}
@@ -38,10 +38,10 @@ Note that the shuffle read phase starts fetching data only after the correspondi
 Meanwhile, the reduce tasks belonging to a same execution phase are scheduled at the same time by default. 
 As a result, all the corresponding reduce tasks start fetching shuffle data almost simultaneously.
 Such synchronized network communication causes a burst demand for network I/O, which in turn greatly enlarges the shuffle read completion time. 
-To desynchronize the network communication, an intuitive way is to launch some tasks in the descendent stage earlier such as "slow-start" from Hadoop MapReduce\cite{hadoop}. 
-However, such pre-scheduling is by no means a panacea. 
+To desynchronize the network communication, an intuitive way is to launch some tasks in the descendent stage earlier, such as "slow-start" from Hadoop MapReduce\cite{hadoop}. 
+However, such early-start is by no means a panacea. 
 \hlyellow{
-Starting a reduce task early always introduces an unnecessary early allocation of slot, which slows down the ancestor stage execution.
+This is because the early-start always introduces an extra early allocation of slot, which slows down the current stage execution.
 }
 % This is because although the reduce tasks can start fetching data earlier, the computation can only take place after all the data is ready. 
 
@@ -86,12 +86,12 @@ Can we efficiently optimize the data shuffling without significantly changing ev
 In this paper, we answer this question in the affirmative with S(huffle)Cache, an open source plug-in system which provides a shuffle-specific optimization for different DAG computing frameworks.
 Specifically, SCache takes over the whole shuffle phase from the underlying framework by providing a cross-framework API for both shuffle write and read.
 SCache's effectiveness lies in the following two key ideas.
-First, SCache decouples the shuffle read and write from both map and reduce tasks.
+First, SCache decouples the shuffle write and read from both map and reduce tasks.
 Such decoupling effectively enables fine-grained resource management and better multiplexing between the computational and I/O resources.
 \hlyellow{
 In addition, SCache pre-schedules the reduce tasks \emph{without launching} them and pre-fetches the shuffle data for the reduce tasks.
-Such pre-scheduling and pre-fetching effectively overlap the network transfer time, desynchronize the network I/O operations, 
-and avoid the unnecessary early allocation of slots.
+Such pre-scheduling and pre-fetching effectively overlap the network transfer time, desynchronize the network operations, 
+and avoid the extra early allocation of slots.
 }
 %In this paper, we introduce S(huffle)Cache, an plugin system to remove shuffle latency for DAG frameworks. SCache takes over the management of shuffle and I/O resources to acheive a fine granularity scheduling of tasks. In addition, SCache pre-schedules the reduce tasks without launching them and perform shuffle data pre-fetch to break the synchronization of shuffle fetch. In order to provide a general optimization for different DAG frameworks, SCache decouple the shuffle process from computing and  provide a cross-frameworks API for shuffle write and read.
 
@@ -107,16 +107,16 @@ By applying these optimizations, SCache can help the DAG framework achieve a sig
 The main challenge to achieve this optimization is \textit{pre-scheduling reduce tasks without launching}. 
 % It is not critical for the simple DAG computing such as Hadoop MapReduce \cite{mapreduce}. 
 \hlyellow{
-Firstly, the complexity of DAG can amplify the defects of na\"{i}ve pre-scheduling schemes. 
-In particular, randomly assign reduce tasks might result in a collision of two heavy tasks on one node. 
+Firstly, the complexity of DAG can amplify the defects of na\"{i}ve scheduling schemes. 
+In particular, randomly assigning reduce tasks might result in a collision of two heavy tasks on one node. 
 This collision can aggravate data skew, thus hurting the performance. 
-Secondly, pre-scheduling without launching violates the design of most frameworks that launches a task after scheduling.
-To address the challenges, we propose a heuristic reduce tasks pre-scheduling scheme with shuffle data prediction and a tasks co-scheduler} (Section \ref{opt}).
+Secondly, pre-scheduling without launching violates the design of most frameworks that launch a task after scheduling.
+To address the challenges, we propose a heuristic task pre-scheduling scheme with shuffle data prediction and a task co-scheduler} (Section \ref{opt}).
 
 Another challenge is the \textit{in-memory data management}. 
 To prevent shuffle data touching the disk, SCache leverages extra memory to store the shuffle data. 
 However, the memory is a precious resource for DAG computing. 
-To minimize the reserved memory while maximizing the performance gain of optimization and memory utilization, we propose two constraints: all-or-nothing and context-aware (Section \ref{memorymanage}).
+To minimize the reserved memory while maximizing the performance gain, we propose two constraints: all-or-nothing and context-aware (Section \ref{memorymanage}).
 %The memory management scheme follows these two contraints to switch shuffle data blocks on and off reserved memory.
 
 We have implemented SCache and a customized Apache Spark \cite{apachespark}. 

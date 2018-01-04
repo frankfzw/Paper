@@ -1,9 +1,9 @@
 %% For double-blind review submission
-%\documentclass[sigplan,10pt,review,anonymous]{acmart}\settopmatter{printfolios=true}\settopmatter{printacmref=false}
+% \documentclass[sigplan,10pt,review,anonymous]{acmart}\settopmatter{printfolios=true}\settopmatter{printacmref=false}
 %% For single-blind review submission
 %\documentclass[sigplan,10pt,review]{acmart}\settopmatter{printfolios=true}
 %% For final camera-ready submission
-\documentclass[sigplan,10pt]{acmart}\settopmatter{}
+\documentclass[sigplan,10pt]{acmart}\settopmatter{printacmref=false}
 
 %% Note: Authors migrating a paper from traditional SIGPLAN
 %% proceedings format to PACMPL format should change 'sigplan' to
@@ -60,8 +60,8 @@
 %% Copyright information
 %% Supplied to authors (based on authors' rights management selection;
 %% see authors.acm.org) by publisher for camera-ready submission
-\setcopyright{none}             %% For review submission
-%\setcopyright{acmcopyright}
+%\setcopyright{none}             %% For review submission
+\setcopyright{acmcopyright}
 %\setcopyright{acmlicensed}
 %\setcopyright{rightsretained}
 %\copyrightyear{2017}           %% If different from \acmYear
@@ -198,11 +198,9 @@
 %\ccsdesc[300]{Social and professional topics~History of programming languages}
 %% End of generated code
 
-
 %% Keywords
 %% comma separated list
-\keywords{Distributed DAG frameworks, Shuffle, Optimization}  %% \keywords is optional
-
+\keywords{Distributed DAG Frameworks, Shuffle, Optimization}  %% \keywords is optional
 
 %% \maketitle
 %% Note: \maketitle command must come after title commands, author
