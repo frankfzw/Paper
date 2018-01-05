@@ -99,7 +99,7 @@ In addition, randomly assigned tasks also ignore the data locality between shuff
 The problem of random mapping is obviously caused by application context (e.g., shuffle data size) ignorance. 
 Note that a balanced schedule decision can be made under the consideration of the size of each reduce task. 
 And the size of a reduce task produced by one shuffle $reduceSize_i = \sum_{j=0}^{m} {BlockSize_{ji}}$. 
-The $m$ is the number of map tasks and can be easily extracted from DAG information. 
+The $m$ is the number of map tasks and it can be easily extracted from DAG information. 
 $BlockSize_{ji}$ represents the size of block which is produced by map $task_j$ for reduce $task_i$ (e.g., block `1-1' in Figure} \ref{fig:shuffle}).
 The final sizes of reduce tasks can be calculated by aggregating $reduceSize_i$ by reduce ID among all shuffle dependencies. 
 So the pre-scheduling can be made if the "prediction" of size of shuffle block is practical.
