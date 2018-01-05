@@ -1,14 +1,13 @@
 \begin{abstract}
 
 \ifrevision
-\reversemarginpar
-\marginnote{60A,D}
+\marginpar{D1}
 \fi
 
 \hlyellow{
 In large-scale data-parallel analytics, shuffle, or the cross-network read and aggregation of partitioned data between tasks with data dependencies, usually brings in large overhead.
 % Due to the dependency constrains, execution of those descendant tasks could be delayed by the inefficient shuffles.
-To reduce shuffle overhead, we present \textit{SCache}, an open source \footnote{https://github.com/frankfzw/SCache} plug-in system that particularly focuses on shuffle optimization. 
+To reduce shuffle overhead, we present \textit{SCache}, an open source plug-in system that particularly focuses on shuffle optimization. 
 %  in frameworks defining jobs as directed acyclic graphs (DAGs). 
 By extracting and analyzing shuffle dependencies prior to the actual task execution, SCache can adopt heuristic pre-scheduling combining with shuffle size prediction to pre-fetch shuffle data and balance load on each node. 
 Meanwhile, SCache takes full advantage of the system memory to accelerate the shuffle process.
