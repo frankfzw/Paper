@@ -23,8 +23,8 @@ The total number of buckets equals the number of reduce tasks in the successive 
 % shuffle data is produced by \textit{data partition}. For \textit{data partition}, 
 The shuffle process can be further split into two parts: \textit{shuffle write} and \textit{shuffle read}. 
 \hlyellow{
-Shuffle write starts at the end of a map task writing the partitioned map output data to local persistent storage. 
-Shuffle read starts at the beginning of a reduce task fetching the partitioned data from remote as its input. 
+Shuffle write starts at the end of a map task and writes the partitioned map output data to local persistent storage. 
+Shuffle read starts at the beginning of a reduce task and fetches the partitioned data from remote as its input. 
 }
 
 %In short, shuffle is loosely coupled with application context and it's I/O intensive.
@@ -56,7 +56,7 @@ The \textit{Shuffle Read and Reduce Execution} is marked from the launch time of
 % 	\label{fig:util}
 % \end{figure*}
 \subsubsection{Coarse Granularity Resource Allocation}
-When a slot is assigned to a task, it will not be released until the the task completes (i.e., the end of shuffle write in Figure \ref{fig:util}). 
+When a slot is assigned to a task, it will not be released until the task completes (i.e., the end of shuffle write in Figure \ref{fig:util}). 
 On the reduce side, the network transfer of shuffle data introduces an explicit I/O delay during shuffle read (i.e., the beginning of shuffle read and execution in Figure \ref{fig:util}). 
 Meanwhile, both shuffle write and shuffle read occupy the slot without involving much CPU as presented in Figure \ref{fig:util}. 
 The current coarse slot -- task mapping results in an inconsistency between resource demands and slot allocation thus decreasing the resource utilization. 

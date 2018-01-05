@@ -3,7 +3,7 @@
 \reversemarginpar
 \marginpar{D3,F1}
 \fi
-Recent years have witnessed widespread use of sophisticated frameworks, such as Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, Spark \cite{spark}, and Apache Tez \cite{tez}.
+Recent years have witnessed the widespread use of sophisticated frameworks, such as Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, Spark \cite{spark}, and Apache Tez \cite{tez}.
 \hlyellow{
 Most of them define jobs as directed acyclic graphs (DAGs), such as map-reduce pipeline in Hadoop MapReduce, lineage of resilient distributed datasets (RDD) in Spark, vertices and edges in Dryad and Tez, etc.
 }
@@ -11,14 +11,14 @@ Despite the differences among data-intensive frameworks, their communication is 
 Such shuffle phase places significant burden for both the disk and network I/O, thus heavily affecting the end-to-end application performance. 
 For instance, a MapReduce trace analysis from Facebook shows that shuffle accounts for 33\% of the job completion time on average, and up to 70\% in shuffle-heavy jobs \cite{managing}.
 
-Although continued efforts of performance optimization have been made among a variety of computing frameworks \cite{sync, babu, tachyon, pacman, quincy, delay}, 
+Although continuous efforts of performance optimization have been made among a variety of computing frameworks \cite{sync, babu, tachyon, pacman, quincy, delay}, 
 the shuffle is often poorly optimized in practice.
 % take over shuffle
 %shuffle characteristic
-In particular, we observe that one major deficiency lies in a lack of fine-grained, coordinated management among different system resources.
+In particular, we observe that one major deficiency lies in the lack of fine-grained, coordinated management among different system resources.
 %In the current practice, the shuffle phase is often split into two parts --- \textit{shuffle read} and \textit{shuffle write}. 
-As Figure \ref{fig:workflow} shows, the \textit{shuffle write} is responsible for writing intermediate results to disk, which is attached to the tasks in ancestor stage (i.e., map task).  
-And the \textit{shuffle read} fetches intermediate results from remote disks through network, which is commonly integrated as part of the tasks in descendant stage (i.e., reduce task). 
+As Figure \ref{fig:workflow} shows, the \textit{shuffle write} is responsible for writing intermediate results to disk, which is attached to the tasks in ancestor stages (i.e., map task).  
+And the \textit{shuffle read} fetches intermediate results from remote disks through network, which is commonly integrated as part of the tasks in descendant stages (i.e., reduce task). 
 Once scheduled, a fixed bundle of resources (i.e., CPU, memory, disk and network) named \textit{slot} is assigned a task, and the resources are released only after the task finishes.
 \ifrevision
 \marginpar{D2}
@@ -44,7 +44,7 @@ Such synchronized network communication causes a burst demand for network I/O, w
 To desynchronize the network communication, an intuitive way is to launch some tasks in the descendent stage earlier, such as "slow-start" from Hadoop MapReduce\cite{hadoop}. 
 However, such early-start is by no means a panacea. 
 \hlyellow{
-This is because the early-start always introduces an extra early allocation of the slot, which slows down the current stage execution.
+This is because the early-start always introduces an extra early allocation of the slot leading to a slow execution of the current stage.
 }
 % This is because although the reduce tasks can start fetching data earlier, the computation can only take place after all the data is ready. 
 
@@ -85,7 +85,7 @@ As a result, even we can effectively resolve the above deficiencies by modifying
 
 % challenge point by point, inside the problem
 
-Can we efficiently optimize the data shuffling without significantly changing every framework?
+Can we efficiently optimize the data shuffling without significantly changing DAG frameworks?
 In this paper, we answer this question in the affirmative with S(huffle)Cache, an open source \footnote{https://github.com/frankfzw/SCache} plug-in system which provides a shuffle-specific optimization for different DAG computing frameworks.
 Specifically, SCache takes over the whole shuffle phase from the underlying framework by providing a cross-framework API for both shuffle write and read.
 SCache's effectiveness lies in the following two key ideas.
@@ -102,12 +102,12 @@ and avoid the extra early allocation of slots.
 }
 %In this paper, we introduce S(huffle)Cache, an plugin system to remove shuffle latency for DAG frameworks. SCache takes over the management of shuffle and I/O resources to acheive a fine granularity scheduling of tasks. In addition, SCache pre-schedules the reduce tasks without launching them and perform shuffle data pre-fetch to break the synchronization of shuffle fetch. In order to provide a general optimization for different DAG frameworks, SCache decouple the shuffle process from computing and  provide a cross-frameworks API for shuffle write and read.
 
-The workflow of DAG framework with SCache is presented in Figure \ref{fig:workflow}. 
+The workflow of a DAG framework with SCache is presented in Figure \ref{fig:workflow}. 
 \hlyellow{
 SCache hijacks the shuffle data of a map task in memory space. 
 The disk operation is skipped and the slot is released after memory copy. 
-The in-memory shuffle data is immediately pre-fetched through network after pre-scheduling of reduce tasks. 
-The application-context-aware memory management caches the shuffle data in memory before the start of the reduce task.
+The in-memory shuffle data is immediately pre-fetched through network after pre-scheduling the reduce tasks. 
+The application-context-aware memory management caches the shuffle data in memory before launching the reduce task.
 By applying these optimizations, SCache can help the DAG framework achieve a significant performance gain. 
 }
 
@@ -129,7 +129,7 @@ To minimize the reserved memory while maximizing the performance gain, we propos
 We have implemented SCache and a customized Apache Spark \cite{apachespark}. 
 The performance of SCache is evaluated with both simulations and testbed experiments on a 50-node Amazon EC2 cluster. 
 We conduct basic test GroupByTest. 
-We also evaluate Terasort \cite{spark-tera} benchmark and standard workloads like TPC-DS \cite{tpcds} for multi-tenant modeling. 
+We also evaluate the system with Terasort \cite{spark-tera} benchmark and standard workloads like TPC-DS \cite{tpcds} for multi-tenant modeling. 
 In a nutshell, SCache can eliminate explicit shuffle process by at most $89\%$ in varied application scenarios. 
 More impressively, SCache reduces $~40\%$ of overall completion time of TPC-DS queries on average.
 
