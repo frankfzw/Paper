@@ -1,7 +1,7 @@
 \section{Implementation}\label{impl}
 This section presents an overview of the implementation of SCache. 
 Here we use Spark as an example of DAG framework to illustrate the work flow of shuffle optimization. 
-We first present the system overview in Subsection \ref{arch} and the detail of sampling in Subsection\ref{sampling}
+We first present the system overview in Subsection \ref{arch} and the detail of sampling in Subsection\ref{sampling}. 
 The following two subsections focus on the two constraints on memory management.
 At last, we discuss the cost of adapting SCache and the fault tolerance. 
 
@@ -63,9 +63,9 @@ After that the slot will be released without blocking on disk operations.
 When a block of the map output (i.e., "map output" in Figure \ref{fig:shuffle}) is received, the SCache worker will send the block ID and the size to the master.
 If the collected map output data reach the observation threshold, the DAG co-scheduler will run the scheduling Algorithm \ref{hminheap} and \ref{mhminheap} to pre-schedule the reduce tasks and then broadcast the scheduling result to start pre-fetching on each worker.
 % After that, when a map task is finished, each node will receive a broadcast message. 
-SCache worker will filter the reduce tasks ID that are scheduled on itself and start pre-fetching shuffle data from the remote. 
+SCache worker will filter the reduce tasks' IDs that are scheduled on itself and start pre-fetching shuffle data from the remote. 
 
-To enforce SCache pre-scheduled tasks -- node mapping, we insert some lines of codes in Spark DAGScheduler.
+To enforce SCache pre-scheduled tasks-node mapping, we insert some lines of codes in Spark DAGScheduler.
 For RDD with shuffle dependencies (ShuffledRDD), Spark DAGScheduler will consult SCache co-scheduler to get the preferred location for each task.
 
 \begin{figure}
@@ -89,7 +89,7 @@ After the prediction, SCache master will call Algorithm \ref{mhminheap} and \ref
 \subsection{Memory Management}\label{memorymanage}
 As mentioned in Section \ref{observation}, though the shuffle size is relatively small, memory management should still be cautious enough to limit the effect of performance of DAG framework.
 When the size of cached blocks reaches the limitation of reserved memory, SCache flushes some of them to the disk temporarily, and re-fetches them when some cached shuffle blocks are consumed or pre-fetched. 
-To achieve the maximum overall improvement, SCache leverages two constraints to manage the in-memory data -- all-or-nothing and context-aware-priority.
+To achieve the maximum overall improvement, SCache leverages two constraints to manage the in-memory data-all-or-nothing and context-aware-priority.
 
 \subsubsection{All-or-Nothing Constraint}
 This acceleration of in-memory cache of a single task is necessary but insufficient for a shorter stage completion time. 
@@ -109,8 +109,7 @@ Unlike the legacy cache managements that are designed to improve the hit rate,
 SCache leverages application context to select victim storage units when the reserved memory is full.
 
 At first, SCache flushes blocks of the incomplete units to disk cluster-widely.
-
-If all the units are completed, SCache selects victims based on two factors -- \textit{inter-shuffle} and \textit{intra-shuffle}.
+If all the units are completed, SCache selects victims based on two factors-\textit{inter-shuffle} and \textit{intra-shuffle}.
 \begin{itemize}[noitemsep]
 	\item Inter-shuffle: SCache master follows the scheduling scheme of Spark to determine the inter-shuffle priority. 
 	For example, Spark FIFO scheduler schedules the tasks of different stages according to the submission order. 
@@ -121,7 +120,7 @@ If all the units are completed, SCache selects victims based on two factors -- \
 	% So SCache sets the priorities according to the submit time of each shuffle unit.
 	\item Intra-shuffle: The intra-shuffle priorities are determined according to the task scheduling inside a stage.
 	For example Spark schedules tasks with smaller ID at first. 
-	Based on this, SCache can assign the lower priority to storage units with larger task ID.
+	Based on this, SCache can assign the lower priority to storage units with a larger task ID.
 \end{itemize}
 
 \subsection{Cost of adapting SCache}
@@ -133,12 +132,12 @@ The concise design makes it easy to modify DAG frameworks to enable SCache optim
 For example, it only takes about 500 lines of code in Spark to integrate SCache. 
 
 \ifrevision
-\marginpar{\small Common}
+\marginpar{\scriptsize Common}
 \fi
 
 By a glance of Hadoop MapReduce \cite{hadoop} source code, we believe that the costs of adapting SCache is also acceptable. 
 \hlyellow{
-The shuffle write and read of MapReduce can be replaced by implementing the interface named} \textit{MapOutputCollector.java} (shuffle write) and \textit{ShuffleConsumerPlugin.java} (shuffle read) using SCache's APIs.
+The shuffle write/read of MapReduce can be replaced by a new implementation of the interface named} \textit{MapOutputCollector.java}/\textit{ShuffleConsumerPlugin.java} using SCache's APIs.
 The DAG information as well as the sampling tasks insertion can be implemented in \textit{JobImp.java}.  
 As for the co-scheduling, the pre-scheduled results from SCache can be enforced by modifying the \textit{RMContainerAllocator.java}. 
 
@@ -152,14 +151,15 @@ Based on the effort of modifying Spark and the feasibility study of Hadoop MapRe
 \reversemarginpar
 \marginpar{C3}
 \fi
-Due to the characteristic of shuffle data (e.g., short-lived, write-once, read-once), we believe fault tolerance is not a crucial goal of SCache. 
+Due to the characteristic of shuffle data (e.g., short-lived, write-once, read-once), we believe fault tolerance is not a crucial goal of SCache at present. 
 We plan to implement SCache master with Apache ZooKeeper \cite{zookeeper} to provide constantly service. 
-If a failure happened inside the SCache worker, SCache daemon cloud blocking the shuffle write/read operations until the worker process restarted without violating the correctness of DAG computing.
-A possible way to handle this failure is selecting some backup nodes to store replications. 
-But the replications can introduce a significant network overhead \cite{availability}.  
 \hlyellow{
-Currently, we left the sever fault such as the failure of a node to the DAG frameworks. 
-We believe it is a more promising way because most DAG frameworks have more advanced fast recovery schemes on application layer, such as paralleled recovery of Spark. 
+If a failure happened inside the SCache worker, SCache daemon could block the shuffle write/read operations until the worker process restarted without violating the correctness of DAG computing.
+A possible way to handle this failure is selecting some backup nodes to store replications. 
+But the replications can introduce a significant network overhead} \cite{availability}.  
+\hlyellow{
+Currently, we left the sever faults (e.g., the failure of a node) to the DAG frameworks. 
+We believe it is a more promising way because most DAG frameworks have more advanced fast recovery schemes on the application layer, such as paralleled recovery of Spark. 
 Meanwhile, SCache can still provide shuffle optimization during the recovery.
 }
 % For SCache worker, a promising way to prevent failure is to select some backup nodes to store replications of shuffle data during pre-scheduling. In addition, there are also advanced fast recovery techniques such as FineFRC \cite{finefrc}. We leave this to the future work.

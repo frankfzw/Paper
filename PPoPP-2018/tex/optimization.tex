@@ -20,7 +20,7 @@ To achieve the decouple from map tasks and reduce tasks, the original shuffle wr
 % During shuffle write of map tasks, the partitioned shuffle data blocks will be written on the disks.
 % Each block contains a part of input data of a particular reduce task. 
 To prevent the release of a slot being blocked by shuffle write,  
-SCache provides a disk-write-like API named $putBlock$ to handle the storage of partitioned shuffle data blocks that produced by a map task.
+SCache provides a disk-write-like API named $putBlock$ to handle the storage of partitioned shuffle data blocks produced by a map task.
 Inside the $putBlock$, SCache uses memory copy to move the shuffle data blocks out of map tasks and store them in the reserved memory.
 After the memory copy, the slot will be released immediately.
 From the perspective of reduce task, SCache provides an API named $getBlock$ to replace the original implementation of shuffle read. 
@@ -32,13 +32,13 @@ Instead, the original implementation of shuffle read will trigger an all-to-all 
 \subsection{Pre-schedule with Application Context}
 \hlyellow{
 The pre-scheduling and pre-fetching are the most critical steps toward the optimization. 
-The task -- node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. 
+The task-node mapping is not determined until tasks are scheduled by the scheduler of DAG framework. 
 Once the tasks are scheduled, the slots will be occupied to launch them. 
-On the other hand, the shuffle data cannot be pre-fetched without the awareness of task -- node mapping.
+On the other hand, the shuffle data cannot be pre-fetched without the awareness of task-node mapping.
 }
 To get rid of this dilemma, we propose a co-scheduling scheme with two heuristic algorithms (Algorithm \ref{hminheap}, \ref{mhminheap}). 
 \hlyellow{
-That is, the task -- node mapping is established in priori, and then it is enforced to the DAG scheduler when the task scheduling starts.
+That is, the task-node mapping is established in priori, and then it is enforced to the DAG scheduler when the task scheduling starts.
 }
 % We explore several pre-scheduling schemes in different scenarios, and evaluate the performance calculating the improvement of reduce tasks completion time with trace of OpenCloud \cite{opencloudtrace}. We first emulate the scheduling algorithm of Spark to schedule the reduce tasks of one job, and take the bottleneck of the task set as the completion time. Then we remove the shuffle read time as the assumption of shuffle data pre-fetch and emulate under different schemes. The result is shown in \ref{fig:sim}.
 % \begin{figure*}
@@ -72,7 +72,7 @@ That is, the task -- node mapping is established in priori, and then it is enfor
 The simplest way of pre-scheduling is mapping tasks to different nodes randomly and evenly. 
 In order to evaluate the effectiveness of random mapping, we use traces from OpenCloud \footnote{\label{fn:trace}http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html} for the simulation.
 }
-Note that most of the traces from OpenCloud is shuffle-light workload as shown in Figure \ref{fig:cdf}. 
+Note that most of the traces from OpenCloud are shuffle-light workload as shown in Figure \ref{fig:cdf}. 
 The average shuffle read time is 3.2\% of total reduce completion time.
 \begin{figure}
 	\centering
@@ -98,10 +98,10 @@ In addition, randomly assigned tasks also ignore the data locality between shuff
 \hlyellow{
 The problem of random mapping is obviously caused by application context (e.g., shuffle data size) ignorance. 
 Note that a balanced schedule decision can be made under the consideration of the size of each reduce task. 
-And the size of each reduce task $reduceSize_i = \sum_{k=0}^{s} \sum_{j=0}^{m} {BlockSize_{ji}}$. 
+And the size of each reduce task $reduceSize_i = \sum_{k=0}^{s} \sum_{j=0}^{m} {BlockSize_{kji}}$. 
 The $s$ is the number of shuffle dependencies. The $m$ is the number of map tasks. 
 Both of them can be easily extracted from DAG information. 
-$BlockSize_{ji}$ represents the size of block which is produced by map $task_j$ for reduce $task_i$ (e.g., block `1-1' in Figure} \ref{fig:shuffle}).
+$BlockSize_{kji}$ represents the size of block which is produced by map $task_j$ for reduce $task_i$ (e.g., block `1-1' in Figure} \ref{fig:shuffle}) in $shuffle_k$.
 So the pre-scheduling can be made if the "prediction" of size of shuffle block is practical.
 % \hlyellow{
 % The shuffle size of each reduce task is decided by input data, map task computation, and hash partitioner. 
@@ -114,16 +114,16 @@ So the pre-scheduling can be made if the "prediction" of size of shuffle block i
 \marginpar{B2,D6,D8}
 \fi
 For the most DAG applications with random large scale input, 
-the $BlockSize_{ji}$ can be predicted with decent accuracy by liner regression model (i.e., equation \ref{linearregresion}) based on observation that the ratio of map output size and input size are invariant given the same job configuration \cite{ishuffle, predict}.
+the $BlockSize_{ji}$ in a particular shuffle can be predicted with decent accuracy by liner regression model (i.e., equation \ref{linearregresion}) based on observation that the ratio of map output size and input size are invariant given the same job configuration \cite{ishuffle, predict}.
 \begin{equation}
 \label{linearregresion}
 \begin{aligned}
-	BlockSize_{ji} = k \times inputSize_j + b
+	BlockSize_{ji} = a \times inputSize_j + b
 \end{aligned}
 \end{equation}
 \hlyellow{
 The $inputSize_j$ is the input size of $j$th map task. 
-The $k$ and $b$ can be determined using the observed $inputSize_j$ and $BlockSize_{ji}$.
+The $a$ and $b$ can be determined using the observed $inputSize_j$ and $BlockSize_{ji}$.
 }
 \begin{figure}
 	\centering
@@ -187,7 +187,7 @@ During both of the predictions, the composition of each reduce partition is calc
 \begin{equation}
 \label{equationprob}
 \begin{aligned}
-	prob_i &= \max_{0 \leq j \leq m} \frac{BlockSize_{ji}}{reduceSize_i} \\
+	prob_i &= \max_{0 \leq j \leq m} \frac{BlockSize_{kji}}{reduceSize_i} \\
     m &= \text{number of map tasks}
 \end{aligned}
 \end{equation}
@@ -235,12 +235,12 @@ In order to balance load while minimizing the network traffic, we present the He
 For the pre-scheduling itself (i.e., the first $while$ in Algorithm} \ref{hminheap}), \hlyellow{the algorithm maintains a min-heap to simulate the load of each node 
 and applies the longest processing time rule (LPT)} \cite{design}\hlyellow{ to achieve $4/3-approximation$ optimum. }
 \hlyellow{
-Since the size of tasks are considered while scheduling, Heuristic MinHeap can achieve shorter makespan than Spark FIFO which is a $2-approximation$ optimum. 
+Since the sizes of tasks are considered while scheduling, Heuristic MinHeap can achieve shorter makespan than Spark FIFO which is a $2-approximation$ optimum. 
 }
 Simulation of OpenCloud trace in Figure \ref{fig:sim} also shows that Heuristic MinHeap has a better improvement (average 5.7\%) than the Spark FIFO (average 2.7\%).
 % After the scheduling, the completion time of reduce stage is close to the optimal. \textcolor{red}{may need to add math prove between this and optimal}.
 \hlyellow{
-After pre-scheduling, the task -- node mapping will be adjusted according to the locality. 
+After pre-scheduling, the task-node mapping will be adjusted according to the locality. 
 The $SWAP\_TASKS$ will be triggered when the $host\_id$ of a task does not equal the $assigned\_id$.
 % The closer $prob$ is to $1/m$, the more evenly this reduce partition is produced in cluster.
 Based on the $prob$, the normalized probability $norm$ is calculated as a bound of performance degradation. 
