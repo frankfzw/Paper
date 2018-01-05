@@ -233,9 +233,9 @@ In order to balance load while minimizing the network traffic, we present the He
 
 \hlyellow{
 For the pre-scheduling itself (i.e., the first $while$ in Algorithm} \ref{hminheap}), \hlyellow{the algorithm maintains a min-heap to simulate the load of each node 
-and applies the longest processing time rule (LPT)} \cite{design}\hlyellow{ to achieve $4/3-approximation$ optimum. }
+and applies the longest processing time rule (LPT)} \cite{design}\hlyellow{ to achieve $4/3\text{-}approximation$ optimum. }
 \hlyellow{
-Since the sizes of tasks are considered while scheduling, Heuristic MinHeap can achieve shorter makespan than Spark FIFO which is a $2-approximation$ optimum. 
+Since the sizes of tasks are considered while scheduling, Heuristic MinHeap can achieve shorter makespan than Spark FIFO which is a $2\text{-}approximation$ optimum. 
 }
 Simulation of OpenCloud trace in Figure \ref{fig:sim} also shows that Heuristic MinHeap has a better improvement (average 5.7\%) than the Spark FIFO (average 2.7\%).
 % After the scheduling, the completion time of reduce stage is close to the optimal. \textcolor{red}{may need to add math prove between this and optimal}.
@@ -322,7 +322,7 @@ To avoid violating the optimization from framework, we present the Accumulated H
 As illustrated in Algorithm \ref{mhminheap}, the sizes of previous $shuffles$ that scheduled by Heuristic MinHeap are counted. 
 \hlyellow{
 When a new shuffle starts, the predicted $size$, $prob$, and $host\_id$ in $p\_reduces$ are accumulated with previous $shuffles$. 
-After scheduling, if the new $assigned\_id$ of a reduce did not equal the original one, a re-shuffle would be triggered to transfer data to the new host. 
+After scheduling, if the new $assigned\_id$ of a reduce task did not equal the original one, a re-shuffle would be triggered to transfer data to the new host. 
 This re-shuffle is rare since the previous shuffle data contributes a huge composition (i.e., high $prob$) after the accumulation, 
 which leads to a higher probability of tasks swap in $SWAP\_TASKS$. 
 }

@@ -4,7 +4,6 @@
 \marginpar{D1}
 \fi
 
-\hlyellow{
 In large-scale data-parallel analytics, shuffle, or the cross-network read and aggregation of partitioned data between tasks with data dependencies, usually brings in large overhead.
 % Due to the dependency constrains, execution of those descendant tasks could be delayed by the inefficient shuffles.
 To reduce shuffle overhead, we present \textit{SCache}, an open source plug-in system that particularly focuses on shuffle optimization. 
@@ -14,6 +13,5 @@ Meanwhile, SCache takes full advantage of the system memory to accelerate the sh
 We have implemented SCache and customized Spark to use it as the external shuffle service and co-scheduler. 
 The performance of SCache is evaluated with both simulations and testbed experiments on a 50-node Amazon EC2 cluster.
 Those evaluations have demonstrated that, by incorporating SCache, the shuffle overhead of Spark can be reduced by nearly $89\%$, and the overall completion time of TPC-DS queries improves $40\%$ on average.
-}
   
 \end{abstract}
