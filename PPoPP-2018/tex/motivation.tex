@@ -89,7 +89,7 @@ We argue that the memory capacity is large enough to store the short-living shuf
 Both experience and DAG framework manuals recommend that multi-round execution of each stage will benefit the performance of applications.
 For a cluster with $n$ number of slots, the number of tasks should be $n \times k (k \geq 1)$. 
 For example, Hadoop MapReduce Tutorial \cite{hadooptutorial} suggests that \textit{10-100 maps} per-node and \textit{0.95 or 1.75 $\times$ number of nodes $\times$ number of maximum container reduces} per-node seem to be the right level of parallelism. 
-Spark configuration also recommends $2-3$ tasks per CPU core \cite{sparkconf} (i.e., $k = 2-3$).
+Spark configuration also recommends $2\text{-}3$ tasks per CPU core \cite{sparkconf} (i.e., $k = 2\text{-}3$).
 Since the shuffle data becomes available as soon as the end of a task's execution. 
 Meanwhile, the network is idle during the map stage (network utilization during map stage in Figure \ref{fig:util}). 
 If the destination host of the shuffle data can be predicted in priori, the property of multi-round can be leveraged to overlap the shuffle read operation.
