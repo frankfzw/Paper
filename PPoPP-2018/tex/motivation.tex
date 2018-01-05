@@ -4,9 +4,7 @@ In this section, we first study the typical shuffle characteristics (\ref{shuffl
 \subsection{Characteristic of Shuffle} \label{shuffle pattern}
 
 In large scale data parallel computing, shuffle is designed to achieve an all-to-all data transfer among nodes. 
-\hlyellow{
 For a clear illustration, we use \textit{map tasks} to define the tasks that produce shuffle data and use \textit{reduce tasks} to define the tasks that consume shuffle data.
-}
 % Note that one task may have both shuffle data generation and consumption in modern DAG framework. These tasks contain characteristic of both map task and reduce task. But these tasks won't change the behavior of shuffle. To avoid ambiguity, in the following paper, we will only use term of map task to represent those who produce shuffle output, and reduce task to represent those who consume shuffle output.
 % \begin{figure}
 % 	\centering
@@ -17,15 +15,11 @@ For a clear illustration, we use \textit{map tasks} to define the tasks that pro
 
 \textbf{Overview of shuffle process}. 
 Each map task partitions the result data (key, value pair) into several buckets according to the partition function (e.g., hash). 
-\hlyellow{
 The total number of buckets equals the number of reduce tasks in the successive step.
-}
 % shuffle data is produced by \textit{data partition}. For \textit{data partition}, 
 The shuffle process can be further split into two parts: \textit{shuffle write} and \textit{shuffle read}. 
-\hlyellow{
 Shuffle write starts at the end of a map task and writes the partitioned map output data to local persistent storage. 
 Shuffle read starts at the beginning of a reduce task and fetches the partitioned data from remote as its input. 
-}
 
 %In short, shuffle is loosely coupled with application context and it's I/O intensive.
 \textbf{Impact of shuffle process}. Shuffle is I/O intensive, which might introduces a significant latency to the application. 
@@ -38,17 +32,13 @@ For instance, a MapReduce trace analysis from Facebook shows that shuffle accoun
 \subsection{Observations} \label{observation}
 % Of course, shuffle is unavoidable in a DAG computing process. 
 Can we mitigate or even remove the overhead of shuffle? 
-\hlyellow{
 To find the answers, we run some typical Spark applications on a 5-node \texttt{m4.xlarge} EC2 cluster.
 Besides, we analyze the design and implementation of shuffle in some DAG frameworks.
-}
 Here we present the hardware utilization trace of one node running Spark \textit{GroupByTest} in Figure \ref{fig:util} as an example. 
 This job has 2 rounds of tasks for each node.
-\hlyellow{
 The \textit{Map Execution} is marked from the launch time of the first map task to the execution end time of the last one. 
 The \textit{Shuffle Write} is marked from the beginning of the first shuffle write in the map stage. 
 The \textit{Shuffle Read and Reduce Execution} is marked from the launch time of the first reduce task.
-}
 % Figure \ref{fig:util} reveals the performance information of two stages that are connected by shuffle. By analyzing the trace with Spark source code \cite{sparksource}, we propose the following observations.
 % \begin{figure*}
 % 	\includegraphics[width=\textwidth]{fig/util}
@@ -60,21 +50,15 @@ When a slot is assigned to a task, it will not be released until the task comple
 On the reduce side, the network transfer of shuffle data introduces an explicit I/O delay during shuffle read (i.e., the beginning of shuffle read and execution in Figure \ref{fig:util}). 
 Meanwhile, both shuffle write and shuffle read occupy the slot without involving much CPU as presented in Figure \ref{fig:util}. 
 The current coarse slot-task mapping results in an inconsistency between task's resource demand and slot allocation thus decreasing the resource utilization. 
-\hlyellow{
-Unfortunately this defect exists in not only Spark} \cite{apachespark} but also Hadoop MapReduce \cite{hadoop} and Apache Tez \cite{tez}. 
-\hlyellow{
+Unfortunately this defect exists in not only Spark \cite{apachespark} but also Hadoop MapReduce \cite{hadoop} and Apache Tez \cite{tez}. 
 To break this inconsistency, a finer granularity resource allocation scheme should be provided. 
-}
 
 \subsubsection{Synchronized Shuffle Read}
 Almost all reduce tasks start shuffle read simultaneously. 
 The synchronized shuffle read requests cause a burst of network traffic. 
 As shown in Figure \ref{fig:util}, 
-\hlyellow{
 the data transfer causes a great demand of network bandwidth, which may result in network congestion and further slow down the network transfer.
-}
-\hlyellow{
-It also happens in other frameworks that follow Bulk Synchronous Parallel (BSP) paradigm, such as} Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc.
+It also happens in other frameworks that follow Bulk Synchronous Parallel (BSP) paradigm, such as Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc.
 % The previous work \cite{coflow, managing} also proves that the network transfer can introduce significant overhead in DAG computing.
 
 \begin{figure}
@@ -95,8 +79,7 @@ The data reported in \cite{makingsense} also show that the amount of data shuffl
 \marginpar{D5}
 \fi
 On the other hand, numbers of memory based distributed storage systems have been proposed \cite{memcached, tachyon, ramcloud} to move data back to memory. 
-\hlyellow{
-But most of the DAG frameworks still store shuffle data on disks }(e.g., Spark \cite{apachespark}, Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc).
+But most of the DAG frameworks still store shuffle data on disks (e.g., Spark \cite{apachespark}, Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc).
 We argue that the memory capacity is large enough to store the short-living shuffle data with cautious management.
 
 \subsubsection{Multi-round Tasks Execution}\label{multi}
@@ -104,9 +87,7 @@ We argue that the memory capacity is large enough to store the short-living shuf
 \marginpar{E7}
 \fi
 Both experience and DAG framework manuals recommend that multi-round execution of each stage will benefit the performance of applications.
-\hlyellow{
 For a cluster with $n$ number of slots, the number of tasks should be $n \times k (k \geq 1)$. 
-}
 For example, Hadoop MapReduce Tutorial \cite{hadooptutorial} suggests that \textit{10-100 maps} per-node and \textit{0.95 or 1.75 $\times$ number of nodes $\times$ number of maximum container reduces} per-node seem to be the right level of parallelism. 
 Spark configuration also recommends $2-3$ tasks per CPU core \cite{sparkconf} (i.e., $k = 2-3$).
 Since the shuffle data becomes available as soon as the end of a task's execution. 
@@ -116,10 +97,8 @@ If the destination host of the shuffle data can be predicted in priori, the prop
 \ifrevision
 \marginpar{\scriptsize Common}
 \fi
-\hlyellow{
 Based on these observations, most of the DAG frameworks share the execution paradigm as well as the defects of shuffle process. 
 To mitigate the shuffle overhead, we propose an optimization that starts shuffle read ahead of reduce stage to overlap the I/O operations in multi-round map tasks, and uses memory to store the shuffle data. 
-}
 To achieve this optimization:
 \begin{itemize}
 	\item Shuffle process should be decoupled from task execution to achieve a fine granularity scheduling scheme.

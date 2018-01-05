@@ -56,9 +56,7 @@ When a Spark job starts, the DAG will be first generated and the shuffle depende
 For each shuffle dependency, the shuffle ID, the type of partitioner, the number of map tasks, and the number of reduce tasks are included. 
 If there was a specialized partitioner, such as RangePartitioner, in the shuffle dependency, the daemon would insert a sampling application before the dependent RDDs. 
 We will elaborate the sampling procedure in Subsection \ref{sampling}.
-\hlyellow{
 When a map task finishes computing, the shuffle write implementation of Spark is modified to call the SCache API and move all the blocks out of Spark executor's JVM through memory copy. 
-}
 After that the slot will be released without blocking on disk operations.
 When a block of the map output (i.e., "map output" in Figure \ref{fig:shuffle}) is received, the SCache worker will send the block ID and the size to the master.
 If the collected map output data reach the observation threshold, the DAG co-scheduler will run the scheduling Algorithm \ref{hminheap} and \ref{mhminheap} to pre-schedule the reduce tasks and then broadcast the scheduling result to start pre-fetching on each worker.
@@ -136,14 +134,11 @@ For example, it only takes about 500 lines of code in Spark to integrate SCache.
 \fi
 
 By a glance of Hadoop MapReduce \cite{hadoop} source code, we believe that the costs of adapting SCache is also acceptable. 
-\hlyellow{
-The shuffle write/read of MapReduce can be replaced by a new implementation of the interface named} \textit{MapOutputCollector.java}/\textit{ShuffleConsumerPlugin.java} using SCache's APIs.
+The shuffle write/read of MapReduce can be replaced by a new implementation of the interface named \textit{MapOutputCollector.java}/\textit{ShuffleConsumerPlugin.java} using SCache's APIs.
 The DAG information as well as the sampling tasks insertion can be implemented in \textit{JobImp.java}.  
 As for the co-scheduling, the pre-scheduled results from SCache can be enforced by modifying the \textit{RMContainerAllocator.java}. 
 
-\hlyellow{
 Based on the effort of modifying Spark and the feasibility study of Hadoop MapReduce, we believe the cost of adapting SCache is low.
-}
 
 \subsection{Discussion of Fault Tolerance}
 
@@ -153,15 +148,12 @@ Based on the effort of modifying Spark and the feasibility study of Hadoop MapRe
 \fi
 Due to the characteristic of shuffle data (e.g., short-lived, write-once, read-once), we believe fault tolerance is not a crucial goal of SCache at present. 
 We plan to implement SCache master with Apache ZooKeeper \cite{zookeeper} to provide constantly service. 
-\hlyellow{
 If a failure happened inside the SCache worker, SCache daemon could block the shuffle write/read operations until the worker process restarted without violating the correctness of DAG computing.
 A possible way to handle this failure is selecting some backup nodes to store replications. 
-But the replications can introduce a significant network overhead} \cite{availability}.  
-\hlyellow{
+But the replications can introduce a significant network overhead \cite{availability}.  
 Currently, we left the sever faults (e.g., the failure of a node) to the DAG frameworks. 
 We believe it is a more promising way because most DAG frameworks have more advanced fast recovery schemes on the application layer, such as paralleled recovery of Spark. 
 Meanwhile, SCache can still provide shuffle optimization during the recovery.
-}
 % For SCache worker, a promising way to prevent failure is to select some backup nodes to store replications of shuffle data during pre-scheduling. In addition, there are also advanced fast recovery techniques such as FineFRC \cite{finefrc}. We leave this to the future work.
 
 
