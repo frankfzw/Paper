@@ -1,2 +1,9 @@
 \section{Conclusion}
- In this paper, we present SCache, a cross-framework open source shuffle optimization system for DAG computing frameworks. SCache decouples the shuffle from computing pipeline and leverages shuffle data pre-fetching to mitigate the I/O overhead of the whole system. By scheduling tasks with application context, SCache bridges the gap among computing stages. Our implementation with Spark and evaluations show that SCache can provide a promising speedup to a DAG framework. We believe that SCache is a simple and efficient system to enhance the performance of most DAG computing frameworks. 
+In this paper, we present SCache, a cross-framework shuffle optimization for DAG computing frameworks. 
+SCache decouples the shuffle from computing tasks and leverages memory to store shuffle data. 
+By tasks pre-scheduling and shuffle data pre-fetching with application context, SCache significantly mitigates the shuffle overhead. 
+Our evaluations on Spark with SCache show that SCache can provide a promising speedup. 
+With the shared defects of shuffle among different frameworks, we believe that the optimization of SCache is general and easy to adapt. 
+
+\section{Acknowledgements}
+This work was supported in part by National Key Research \& Development Program of China (No. 2016YFB1000502), National NSF of China (NO. 61672344, 61525204, 61732010), and Shanghai Key Laboratory of Scalable Computing and Systems.
