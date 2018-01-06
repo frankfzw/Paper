@@ -95,11 +95,12 @@ and avoid the extra early allocation of slots.
 %In this paper, we introduce S(huffle)Cache, an plugin system to remove shuffle latency for DAG frameworks. SCache takes over the management of shuffle and I/O resources to acheive a fine granularity scheduling of tasks. In addition, SCache pre-schedules the reduce tasks without launching them and perform shuffle data pre-fetch to break the synchronization of shuffle fetch. In order to provide a general optimization for different DAG frameworks, SCache decouple the shuffle process from computing and  provide a cross-frameworks API for shuffle write and read.
 
 The workflow of a DAG framework with SCache is presented in Figure \ref{fig:workflow}. 
-SCache hijacks the shuffle data of a map task in memory space. 
-The disk operation is skipped and the slot is released after memory copy. 
-The in-memory shuffle data is immediately pre-fetched through network after pre-scheduling the reduce tasks. 
+SCache replaces the disk operations of shuffle write by the memory copy in map tasks. 
+The slot is released after the memory copy. 
+The shuffle data is stored in the reserved memory of SCache until all reduce tasks are pre-scheduled. 
+Then the shuffle data is pre-fetched according to the pre-scheduling results.  
 The application-context-aware memory management caches the shuffle data in memory before launching the reduce task.
-By applying these optimizations, SCache can help the DAG framework achieve a significant performance gain. 
+By applying these optimizations, SCache can help the DAG framework achieve a significant performance gain.  
 
 The main challenge to achieve this optimization is \textit{pre-scheduling reduce tasks without launching}. 
 % It is not critical for the simple DAG computing such as Hadoop MapReduce \cite{mapreduce}. 
