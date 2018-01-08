@@ -172,7 +172,7 @@ It implies that the heuristic locality swap of SCache can obtain the best locali
 	\includegraphics[width=0.85\textwidth]{fig/tpcds}
 	\caption{TPC-DS Benchmark Evaluation}
 	\label{fig:tpcds}
-	\vspace{-1em}
+	\vspace{-1.2em}
 \end{figure*}
 \subsection{Production Workload}
 We also evaluate some queries from TPC-DS \cite{tpcds}. 
@@ -223,5 +223,5 @@ In Figure \ref{fig:sampling}, the overhead of sampling only grows with the incre
 But it remains relatively stable when the cluster size scales up.
 Since the shuffle data is short-lived, write-once, and read-once, the central controller of SCache does not have to collect and manage complex metadata. 
 Meanwhile, most of the optimizations such as fetching and storing shuffle data are finished by workers independently. 
-So the cost of pre-scheduling algorithm and memory management are unlikely to make the master become the bottleneck of the whole system.
-The cost analysis of central controller, combined with the sampling overhead evaluation, makes SCache a scalable system.
+So the cost of pre-scheduling algorithm and memory management are unlikely to make the master become the bottleneck of the scalability.
+Combined with the sampling overhead evaluation, we believe that SCache is scalable.

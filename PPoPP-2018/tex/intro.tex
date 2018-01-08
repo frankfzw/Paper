@@ -37,7 +37,7 @@ Note that the shuffle read phase starts fetching data only after the correspondi
 Meanwhile, the reduce tasks belonging to a same execution phase are scheduled at the same time by default. 
 As a result, all the corresponding reduce tasks start fetching shuffle data almost simultaneously.
 Such synchronized network communication causes a burst demand for network I/O, which in turn greatly enlarges the shuffle read completion time. 
-To desynchronize the network communication, an intuitive way is to launch some tasks in the descendent stage earlier, such as "slow-start" from Hadoop MapReduce\cite{hadoop}. 
+To desynchronize the network communication, an intuitive way is to launch some tasks in the descendent stage earlier, such as "slow-start" from Hadoop MapReduce \cite{hadoop}. 
 However, such early-start is by no means a panacea. 
 This is because the early-start always introduces an extra early allocation of the slot leading to a slow execution of the current stage.
 % This is because although the reduce tasks can start fetching data earlier, the computation can only take place after all the data is ready. 
