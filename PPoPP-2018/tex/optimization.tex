@@ -22,6 +22,7 @@ To prevent the release of a slot being blocked by shuffle write,
 SCache provides a disk-write-like API named $putBlock$ to handle the storage of partitioned shuffle data blocks produced by a map task.
 Inside the $putBlock$, SCache uses memory copy to move the shuffle data blocks out of map tasks and store them in the reserved memory.
 After the memory copy, the slot will be released immediately.
+
 From the perspective of reduce task, SCache provides an API named $getBlock$ to replace the original implementation of shuffle read. 
 With the precondition of shuffle data pre-fetching, 
 the $getBlock$ leverages the memory copy to fetch the shuffle data from the local memory of SCache.
