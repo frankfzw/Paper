@@ -32,8 +32,7 @@ For instance, a MapReduce trace analysis from Facebook shows that shuffle accoun
 \subsection{Observations} \label{observation}
 % Of course, shuffle is unavoidable in a DAG computing process. 
 Can we mitigate or even remove the overhead of shuffle? 
-To find the answers, we ran some typical Spark applications on a 5-node \texttt{m4.xlarge} EC2 cluster.
-and analyzed the design and implementation of shuffle in some DAG frameworks.
+To find the answers, we ran some typical Spark applications on a 5-node \texttt{m4.xlarge} EC2 cluster and analyzed the design and implementation of shuffle in some DAG frameworks.
 Here we present the hardware utilization trace of one node running Spark's \textit{GroupByTest} in Figure \ref{fig:util} as an example. 
 This job has 2 rounds of tasks for each node.
 The \textit{Map Execution} is marked from the launch time of the first map task to the execution end time of the last one. 
@@ -90,14 +89,16 @@ Both experience and DAG framework manuals recommend that multi-round execution o
 For a cluster with $n$ slots, the number of tasks should be $n \times k (k \geq 1)$. 
 For example, Hadoop MapReduce Tutorial \cite{hadooptutorial} suggests that \textit{10-100 maps} per-node and \textit{0.95 or 1.75 $\times$ number of nodes $\times$ number of maximum container reduces} per-node seem to be the right level of parallelism. 
 Spark configuration also recommends $2\text{-}3$ tasks per CPU core \cite{sparkconf} (i.e., $k = 2\text{-}3$).
-Since the shuffle data becomes available as soon as the end of a task's execution 
-and the network is idle during the map stage (network utilization during map stage in Figure \ref{fig:util}), 
-the property of multi-round tasks can be leveraged to optimize the shuffle read operations if the destination host of the shuffle data can be predicted a priori. 
+Since the shuffle data becomes available as soon as the end of a task's execution, 
+and the network is idle during the map stage ("Network TX" during map stage in Figure \ref{fig:util}), 
+the property of multi-round tasks execution can be leveraged to hide the cost by starting shuffle data transfer as soon as a map task ends. 
+% optimize the shuffle read operations if the destination host of the shuffle data can be predicted a priori. 
 % There are at least two persistent storage operations for each shuffle data block. At first, Spark will write shuffle data to the persistent storage after map task execution (i.e. \textit{shuffle write} in Figure \ref{fig:util}). During the \textit{shuffle read}, Spark will read shuffle data from remote and local persistent storage, which is the second operation. The persistence of shuffle data was designed for fault tolerance. But we believe it is not necessary for today's cluster. Recall that shuffle data only exist in a short time scale. But the Mean Time To Failure (MTTF) for a server is counted in the scale of year \cite{tachyon}, which is exponential compared with the duration of a shuffle. In addition, the capacity of memory and network has been increasing rapidly in recent years. As a result, numbers of memory based distributed storage system have been proposed \cite{memcached, tachyon, ramcloud}. On the other hand, the size of shuffle data is relatively small. For example, shuffle size of Spark Terasort \cite{spark-tera} is less than 25\% of input data. The data reported in  \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as 10\%-20\%. We argue that removing persistent storage and using memory to achieve shuffle fault tolerance is feasible and efficient.
 \ifrevision
 \marginpar{\scriptsize Common}
 \fi
-Based on these observations, most of the DAG frameworks share the execution paradigm as well as the defects of shuffle process. 
+
+Based on these observations, most of the DAG frameworks share the execution paradigm as well as the expense of shuffle process. 
 To mitigate the shuffle overhead, we propose an optimization that starts shuffle read ahead of reduce stage to overlap the I/O operations in multi-round map tasks, and uses memory to store the shuffle data. 
 To achieve this optimization:
 \begin{itemize}

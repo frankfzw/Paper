@@ -131,7 +131,7 @@ For example, it only takes about 500 lines of code in Spark to integrate SCache.
 \marginpar{\scriptsize Common}
 \fi
 
-By a glance of Hadoop MapReduce \cite{hadoop} source code, we believe that the costs of adapting SCache is also acceptable. 
+From the Hadoop MapReduce \cite{hadoop} source code, we believe that the costs of adapting SCache is also acceptable. 
 The shuffle write/read of MapReduce can be replaced by a new implementation of the interface named \textit{MapOutputCollector.java}/\textit{ShuffleConsumerPlugin.java} using SCache's APIs.
 The DAG information as well as the sampling tasks insertion can be implemented in \textit{JobImp.java}.  
 As for the co-scheduling, the pre-scheduled results from SCache can be enforced by modifying the \textit{RMContainerAllocator.java}. 

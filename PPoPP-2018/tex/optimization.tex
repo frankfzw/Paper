@@ -76,7 +76,7 @@ The average shuffle read time is 3.2\% of total reduce completion time.
 \end{figure}
 As shown in Figure \ref{fig:sim}, the baseline (i.e., red dotted line) is the stage completion time with Spark FIFO scheduling algorithm. 
 We then remove the shuffle read time of each task and run the simulation under three scheduling schemes: random mapping, Spark FIFO, and our heuristic MinHeap.
-Random mapping works well when there is only one round of tasks, but the performance collapses as the round number grows. 
+Random mapping works well when there is only one round of tasks, but the performance drops as the round number grows. 
 This is because that data skew commonly exists in data-parallel computing \cite{skewtune, reining, gufler2012load}. 
 Several heavy tasks may be assigned to the same node, thus slowing down the whole stage. 
 In addition, randomly assigned tasks also ignore the data locality between shuffle map output and reduce input, which may introduce extra network traffic in cluster.
@@ -197,7 +197,7 @@ This parameter is used to achieve a better data locality while performing shuffl
 \fi
 
 As long as the input sizes of reduce tasks are available, the pre-scheduling is a classic scheduling problem without considering the data locality. 
-But ignoring overhead of data locality can introduce extra network transfer. 
+But ignoring the data locality can introduce extra network transfer. 
 In order to balance load while minimizing the network traffic, we present the Heuristic MinHeap scheduling algorithm (Algorithm \ref{hminheap}).   
 
 For the pre-scheduling itself (i.e., the first $while$ in Algorithm \ref{hminheap}), the algorithm maintains a min-heap to simulate the load of each node 
@@ -219,7 +219,7 @@ Inside the $SWAP\_TASKS$, tasks will be selected and swapped without exceeding t
 A reduce stage can have more than one shuffle dependencies in the current DAG computing frameworks. 
 The technique mentioned in Section \ref{shuffleprediction} can only handle an ongoing shuffle. 
 For those pending shuffles, it is impossible to predict their sizes. 
-This dilemma can be relieved by having all map tasks of different shuffles to be launched simultaneously. 
+This problem can be solved by having all map tasks of pending shuffles launched simultaneously. 
 But doing this introduces large overhead such as extra task serialization. 
 To avoid violating the optimization from framework, we present the Accumulated Heuristic Scheduling algorithm to cope with multiple shuffle dependencies.
 
@@ -281,7 +281,7 @@ To avoid violating the optimization from framework, we present the Accumulated H
 \end{algorithm}
 \end{minipage}
 
-As illustrated in Algorithm \ref{mhminheap}, the sizes of previous \emph{shuffles} that scheduled by Heuristic MinHeap are counted. 
+As illustrated in Algorithm \ref{mhminheap}, the sizes of previous \emph{shuffles} scheduled by Heuristic MinHeap are counted. 
 When a new shuffle starts, the predicted $size$, $prob$, and $host\_id$ in $p\_reduces$ are accumulated with previous \emph{shuffles}. 
 After scheduling, if the new $assigned\_id$ of a reduce task did not equal the original one, a re-shuffle will be triggered to transfer data to the new host. 
 This re-shuffle is rare since the previous shuffle data contributes a huge composition (i.e., high $prob$) after the accumulation, 
