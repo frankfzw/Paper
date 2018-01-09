@@ -4,46 +4,6 @@ Here we use Spark as an example of DAG framework to illustrate the work flow of 
 We first present the system overview in Subsection \ref{arch} and the detail of sampling in Subsection\ref{sampling}. 
 The following two subsections focus on the two constraints on memory management.
 At last, we discuss the cost of adapting SCache and the fault tolerance. 
-
-\begin{minipage}{\columnwidth}
-\begin{algorithm}[H]
-\caption{Accumulated Heuristic Scheduling for Multi-Shuffles}
-\label{mhminheap}
-	\begin{algorithmic}[1]
-	\small
-	\Procedure{\Large m\_schedule}{$m, host\_id, p\_reduces, shuffles$}
-		\State $m\gets$ partition number of map tasks
-		\Comment $shuffles$ is the previous schedule result 
-		\ForAll{$r$ in $p\_reduces$}
-			\State $r.size \mathrel{+}= shuffles\left[r.rid\right].size$
-			\State $new\_prob\gets shuffles\left[r.rid\right].size / r.size$
-			\If{$new\_prob\geq r.prob$}
-				\State $r.prob\gets new\_prob$
-				\State $r.host\_id\gets shuffles\left[r.rid\right].assigned\_host$
-			\EndIf
-		\EndFor
-		\State $M\gets$ $SCHEDULE\left(m, host\_id, p\_reduces\right)$
-		\ForAll{$host\_id$ in $M$}
-			\Comment Re-shuffle
-			\ForAll{$r$ in $M\left[host\_id\right].reduces$}
-				\If{$host\neq shuffles\left[r.rid\right].assigned\_host$}
-				\State Re-shuffle data to $host$
-				\State $shuffles\left[r.rid\right].assigned\_host\gets host$
-				\EndIf
-			\EndFor
-		\EndFor
-		\Return $M$
-	\EndProcedure
-	\end{algorithmic}
-\end{algorithm}
-\end{minipage}
-
-\subsection{System Overview}\label{arch}
-SCache consists of three components: a distributed shuffle data management system, a DAG co-scheduler, and a daemon inside Spark. As shown in Figure \ref{fig:arch}, SCache employs the legacy master-slaves architecture like GFS \cite{gfs} for shuffle data management system. 
-
-The master node of SCache coordinates the shuffle blocks globally with application context. The worker node reserves memory to store blocks.
-The coordination provides two guarantees: (a)data is stored in memory before tasks start and (b)data is scheduled on-off memory with all-or-nothing and context-aware constraints. 
-The daemon bridges the communication between Spark and SCache. The co-scheduler is dedicated to pre-schedule reduce tasks with DAG information and enforce the scheduling results to Spark scheduler.
 \begin{figure}
 	\centering
 	\includegraphics[width=0.8\linewidth]{fig/arch}
@@ -51,6 +11,13 @@ The daemon bridges the communication between Spark and SCache. The co-scheduler 
 	\label{fig:arch}
 	\vspace{-1em}
 \end{figure}
+\subsection{System Overview}\label{arch}
+SCache consists of three components: a distributed shuffle data management system, a DAG co-scheduler, and a daemon inside Spark. As shown in Figure \ref{fig:arch}, SCache employs the legacy master-slaves architecture like GFS \cite{gfs} for shuffle data management system. 
+
+The master node of SCache coordinates the shuffle blocks globally with application context. The worker node reserves memory to store blocks.
+The coordination provides two guarantees: (a)data is stored in memory before tasks start and (b)data is scheduled on-off memory with all-or-nothing and context-aware constraints. 
+The daemon bridges the communication between Spark and SCache. The co-scheduler is dedicated to pre-schedule reduce tasks with DAG information and enforce the scheduling results to Spark scheduler.
+
 When a Spark job starts, the DAG will be first generated and the shuffle dependencies among Resilient Distributed Datasets (RDDs) will be submitted through the daemon process in Spark driver. 
 % The SCache master recognizes all shuffle dependencies in a RPC call as a shuffle scheduling unit.
 For each shuffle dependency, the shuffle ID, the type of partitioner, the number of map tasks, and the number of reduce tasks are included. 
