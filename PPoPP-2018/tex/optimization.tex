@@ -292,24 +292,24 @@ which leads to a higher probability of tasks swap in $SWAP\_TASKS$.
 \label{mhminheap}
 	\begin{algorithmic}[1]
 	\small
-	\Procedure{\Large m\_schedule}{$m, host\_id, p\_reduces, shuffles$}
+	\Procedure{\Large m\_schedule}{$m, host\_id, p\_reduces, \text{\emph{shuffles}}$}
 		\State $m\gets$ partition number of map tasks
-		\Comment $shuffles$ is the previous schedule result 
+		\Comment \emph{shuffles} is the previous schedule result 
 		\ForAll{$r$ in $p\_reduces$}
-			\State $r.size \mathrel{+}= shuffles\left[r.rid\right].size$
-			\State $new\_prob\gets shuffles\left[r.rid\right].size / r.size$
+			\State $r.size \mathrel{+}= \text{\emph{shuffles}}\left[r.rid\right].size$
+			\State $new\_prob\gets \text{\emph{shuffles}}\left[r.rid\right].size / r.size$
 			\If{$new\_prob\geq r.prob$}
 				\State $r.prob\gets new\_prob$
-				\State $r.host\_id\gets shuffles\left[r.rid\right].assigned\_host$
+				\State $r.host\_id\gets \text{\emph{shuffles}}\left[r.rid\right].assigned\_host$
 			\EndIf
 		\EndFor
 		\State $M\gets$ $SCHEDULE\left(m, host\_id, p\_reduces\right)$
 		\ForAll{$host\_id$ in $M$}
 			\Comment Re-shuffle
 			\ForAll{$r$ in $M\left[host\_id\right].reduces$}
-				\If{$host\neq shuffles\left[r.rid\right].assigned\_host$}
+				\If{$host\neq \text{\emph{shuffles}}\left[r.rid\right].assigned\_host$}
 				\State Re-shuffle data to $host$
-				\State $shuffles\left[r.rid\right].assigned\_host\gets host$
+				\State $\text{\emph{shuffles}}\left[r.rid\right].assigned\_host\gets host$
 				\EndIf
 			\EndFor
 		\EndFor
