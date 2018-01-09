@@ -7,7 +7,7 @@
 \end{figure}
 This section reveals the evaluation of SCache with comprehensive workloads and benchmarks. 
 % First we run a job with single shuffle to analyze hardware utilization and impacts of shuffle optimization from the scope of a task to a job. 
-First we run a job with single shuffle to analyze hardware utilization and impacts of different components from the scope of a task to a job. 
+First we run a job with single shuffle to analyze hardware utilization and see the impacts of different components from the scope of a task to a job. 
 Then we use a recognized shuffle intensive benchmark-Terasort \cite{spark-tera} to evaluate the pre-scheduling scheme of SCache. 
 \begin{figure*}
 	\centering
@@ -63,8 +63,8 @@ Then we use a recognized shuffle intensive benchmark-Terasort \cite{spark-tera} 
 	\vspace{-1em}
 \end{figure*}
 In order to prove the performance gain of SCache with a real production workload, we also evaluate Spark TPC-DS \footnote{https://github.com/databricks/spark-sql-perf} and present the overall performance improvement.
-At last, we measure the overhead of weighted reservoir sampling. 
-In short, SCache can decrease ~$89\%$ time of Spark shuffle without introducing extra network transfer. 
+Finally, we measure the overhead of weighted reservoir sampling. 
+In summary, SCache can decrease ~$89\%$ time of Spark shuffle without introducing extra network transfer. 
 % Furthermore, SCache achieves a ~$75\%$ and ~$50\%$ improvement of reduce stage completion time respectively in simple DAG application and Terasort without introducing extra network traffic. 
 More impressively, the overall completion time of TPC-DS can be improved ~$40\%$ on average by applying the optimization from SCache.
 % Because a complex Spark application consists of multiple stages. The completion time of each stage varies under different input data, configurations and different number of stages. This uncertainty leads to the dilemma that dramatic fluctuation occurs in overall performance comparison. To present a straightforward illustration, we limit the scope of most evaluations in a single stage.
@@ -74,14 +74,14 @@ More impressively, the overall completion time of TPC-DS can be improved ~$40\%$
 \marginpar{F4}
 \fi
 We modified Spark to enable shuffle optimization of SCache as a representative.
-The shuffle configuration of Spark is set as the default \cite{sparkconf}. 
+The shuffle configuration of Spark is set to the default \cite{sparkconf}. 
 We run the experiments on a 50-node m4.xlarge cluster on Amazon EC2 \footnote{http://aws.amazon.com/ec2/}. 
-Each node has 16GB memory and 4 CPUs. The network bandwidth is not specifically provided by Amazon. 
-Our evaluations reveal the bandwidth is about 300 Mbps (see Figure \ref{fig:util}).
+Each node has 16GB memory and 4 CPUs. The network bandwidth provided by Amazon is insufficient. 
+Our evaluations reveal the bandwidth is only about 300 Mbps (see Figure \ref{fig:util}).
 
 \subsection{Simple DAG Analysis}\label{simpledag}
 %\subsubsection{Hardware Utilization}
-We first run the same single shuffle test as mentioned in Figure \ref{fig:util}. 
+We first run the same single shuffle test shown in Figure \ref{fig:util}. 
 For each stage, we run 5 rounds of tasks with different input size. 
 As shown in Figure \ref{fig:scache_util}, the hardware utilization is captured from one node during the job. 
 Note that since the completion time of whole job is about $50\%$ less than Spark without SCache, the duration of Figure \ref{fig:scache_util} is cut in half as well. 
@@ -183,7 +183,7 @@ TPC-DS contains 99 queries and is considered as the standardized industry benchm
 \reversemarginpar
 \marginpar{F2,F6}
 \fi
-As shown in Figure \ref{fig:tpcds}, the horizontal axis is query name, and the vertical axis is query completion time. 
+As shown in Figure \ref{fig:tpcds}, the horizontal axis is query name and the vertical axis is query completion time. 
 Note that we skip some queries due to the compatible issues. 
 Spark with SCache outperforms the original Spark in almost all tested queries. 
 Furthermore, in many queries, Spark with SCache outperforms original Spark by an order of magnitude. 
@@ -207,8 +207,6 @@ Since this evaluation presents the overall job completion time of queries, we be
 % 	\caption{Terasort Evaluation}
 % \end{figure}
 \subsection{Overhead of Sampling}
-In this part, we evaluate the overhead of sampling with different input sizes and numbers of nodes. 
-In Figure \ref{fig:sampling}, the overhead of sampling only grows with the increase of input size on each node. 
 \ifrevision
 \reversemarginpar
 \marginpar{F7}
@@ -220,7 +218,8 @@ In Figure \ref{fig:sampling}, the overhead of sampling only grows with the incre
 	\label{fig:sampling}
 	\vspace{-1em}
 \end{figure}
-But it remains relatively stable when the cluster size scales up.
+We evaluate the overhead of sampling with different input sizes and numbers of nodes. 
+In Figure \ref{fig:sampling}, the overhead of sampling only grows with the increase of input size on each node, but remains relatively stable when the cluster size scales up.
 Since the shuffle data is short-lived, write-once, and read-once, the central controller of SCache does not have to collect and manage complex metadata. 
 Meanwhile, most of the optimizations such as fetching and storing shuffle data are finished by workers independently. 
 So the cost of pre-scheduling algorithm and memory management are unlikely to make the master become the bottleneck of the scalability.

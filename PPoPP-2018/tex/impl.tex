@@ -57,9 +57,9 @@ For each shuffle dependency, the shuffle ID, the type of partitioner, the number
 If there was a specialized partitioner, such as RangePartitioner, in the shuffle dependency, the daemon would insert a sampling application before the dependent RDDs. 
 We will elaborate the sampling procedure in Subsection \ref{sampling}.
 When a map task finishes computing, the shuffle write implementation of Spark is modified to call the SCache API and move all the blocks out of Spark executor's JVM through memory copy. 
-After that the slot will be released without blocking on disk operations.
+After that the slot will be released (without blocking on disk operations).
 When a block of the map output (i.e., "map output" in Figure \ref{fig:shuffle}) is received, the SCache worker will send the block ID and the size to the master.
-If the collected map output data reach the observation threshold, the DAG co-scheduler will run the scheduling Algorithm \ref{hminheap} and \ref{mhminheap} to pre-schedule the reduce tasks and then broadcast the scheduling result to start pre-fetching on each worker.
+If the collected map output data reach the observation threshold, the DAG co-scheduler will run the scheduling Algorithm \ref{hminheap} or \ref{mhminheap} to pre-schedule the reduce tasks and then broadcast the scheduling result to start pre-fetching on each worker.
 % After that, when a map task is finished, each node will receive a broadcast message. 
 SCache worker will filter the reduce tasks' IDs that are scheduled on itself and start pre-fetching shuffle data from the remote. 
 
@@ -81,12 +81,12 @@ For the sample number, it can be tuned to balance the overhead and accuracy.
 The sampling job randomly selects some items and performs a local shuffle with partitioner (see Figure \ref{fig:sample}). 
 At the same time, the items number is counted as the weight. 
 These sampling data will be aggregated by reduce task ID on SCache master to predict the reduce partition size. 
-After the prediction, SCache master will call Algorithm \ref{mhminheap} and \ref{hminheap} to do the pre-scheduling.
+After the prediction, SCache master will call Algorithm \ref{hminheap} or \ref{mhminheap} to do the pre-scheduling.
 
 % In the case of extreme skew scenario, such as Figure \ref{fig:range_pre_sample}, Heuristic MinHeap trades about 0.05\% percent of stage completion time for 99\% reduction of shuffle data transmission through network by heuristicly swapping tasks.
 \subsection{Memory Management}\label{memorymanage}
 As mentioned in Section \ref{observation}, though the shuffle size is relatively small, memory management should still be cautious enough to limit the effect of performance of DAG framework.
-When the size of cached blocks reaches the limitation of reserved memory, SCache flushes some of them to the disk temporarily, and re-fetches them when some cached shuffle blocks are consumed or pre-fetched. 
+When the size of cached blocks reaches the limit of reserved memory, SCache flushes some of them to the disk temporarily, and re-fetches them when some cached shuffle blocks are consumed or pre-fetched. 
 To achieve the maximum overall improvement, SCache leverages two constraints to manage the in-memory data-all-or-nothing and context-aware-priority.
 
 \subsubsection{All-or-Nothing Constraint}
@@ -101,9 +101,7 @@ For those incomplete units, SCache marks them as the lowest priority.
 % Following the all-or-noting constraint can maximum the improvement in stage completion time by using reserved memory efficiently.
 
 \subsubsection{Context-Aware-Priority Constraint}
-Unlike the traditional cache replacement schemes such as MIN \cite{min}, the cached shuffle data will only be used once (without failure). 
-% That is, the effort of improving hit rate in most legacy schemes can not benefit DAG application, while their approaches can easily violate the all-or-nothing constraint.
-Unlike the legacy cache managements that are designed to improve the hit rate, 
+Unlike the traditional cache replacement schemes such as MIN \cite{min}, the cached shuffle data will only be used once (without failure), but the legacy cache managements are designed to improve the hit rate.
 SCache leverages application context to select victim storage units when the reserved memory is full.
 
 At first, SCache flushes blocks of the incomplete units to disk cluster-widely.

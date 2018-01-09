@@ -32,9 +32,9 @@ For instance, a MapReduce trace analysis from Facebook shows that shuffle accoun
 \subsection{Observations} \label{observation}
 % Of course, shuffle is unavoidable in a DAG computing process. 
 Can we mitigate or even remove the overhead of shuffle? 
-To find the answers, we run some typical Spark applications on a 5-node \texttt{m4.xlarge} EC2 cluster.
-Besides, we analyze the design and implementation of shuffle in some DAG frameworks.
-Here we present the hardware utilization trace of one node running Spark \textit{GroupByTest} in Figure \ref{fig:util} as an example. 
+To find the answers, we ran some typical Spark applications on a 5-node \texttt{m4.xlarge} EC2 cluster.
+and analyzed the design and implementation of shuffle in some DAG frameworks.
+Here we present the hardware utilization trace of one node running Spark's \textit{GroupByTest} in Figure \ref{fig:util} as an example. 
 This job has 2 rounds of tasks for each node.
 The \textit{Map Execution} is marked from the launch time of the first map task to the execution end time of the last one. 
 The \textit{Shuffle Write} is marked from the beginning of the first shuffle write in the map stage. 
@@ -48,16 +48,16 @@ The \textit{Shuffle Read and Reduce Execution} is marked from the launch time of
 \subsubsection{Coarse Granularity Resource Allocation}
 When a slot is assigned to a task, it will not be released until the task completes (i.e., the end of shuffle write in Figure \ref{fig:util}). 
 On the reduce side, the network transfer of shuffle data introduces an explicit I/O delay during shuffle read (i.e., the beginning of shuffle read and execution in Figure \ref{fig:util}). 
-Meanwhile, both shuffle write and shuffle read occupy the slot without involving much CPU as presented in Figure \ref{fig:util}. 
-The current coarse slot-task mapping results in an inconsistency between task's resource demand and slot allocation thus decreasing the resource utilization. 
-Unfortunately this defect exists in not only Spark \cite{apachespark} but also Hadoop MapReduce \cite{hadoop} and Apache Tez \cite{tez}. 
-To break this inconsistency, a finer granularity resource allocation scheme should be provided. 
+Meanwhile, both shuffle write and shuffle read occupy the slot without significantly involving CPU as presented in Figure \ref{fig:util}. 
+The current coarse slot-task mapping results in an imbalance between task's resource demand and slot allocation thus decreasing the resource utilization. 
+Unfortunately this defect exists not only in Spark \cite{apachespark} but also Hadoop MapReduce \cite{hadoop} and Apache Tez \cite{tez}. 
+A finer granularity resource allocation scheme should be provided to reduce these delays. 
 
 \subsubsection{Synchronized Shuffle Read}
 Almost all reduce tasks start shuffle read simultaneously. 
 The synchronized shuffle read requests cause a burst of network traffic. 
 As shown in Figure \ref{fig:util}, 
-the data transfer causes a great demand of network bandwidth, which may result in network congestion and further slow down the network transfer.
+the data transfer causes a high demand of network bandwidth, which may result in network congestion and further slow down the network transfer.
 It also happens in other frameworks that follow Bulk Synchronous Parallel (BSP) paradigm, such as Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc.
 % The previous work \cite{coflow, managing} also proves that the network transfer can introduce significant overhead in DAG computing.
 
@@ -71,15 +71,15 @@ It also happens in other frameworks that follow Bulk Synchronous Parallel (BSP) 
 \subsubsection{Inefficient Persistent Storage Operation}
 At first, both shuffle write and read are tightly coupled with task execution, which results in a blocking I/O operation. 
 This blocking I/O operation along with synchronized shuffle read may introduce significant latency, especially in an I/O performance bounded cluster.
-Besides, the legacy of storing shuffle data on disk is too conservative in modern cluster with large memory. 
+Besides, the legacy of storing shuffle data on disk is inefficient in modern clusters with large memory. 
 Compared to input dataset, the size of shuffle data is relatively small. 
 For example, the shuffle size of Spark Terasort \cite{spark-tera} is less than 25\% of input data. 
-The data reported in \cite{makingsense} also show that the amount of data shuffled is less than input data, by as much as 10\%-20\%. 
+The data reported in \cite{makingsense} also show that the amount of data shuffled is less than the input data by as much as 10\%-20\%. 
 \ifrevision
 \marginpar{D5}
 \fi
-On the other hand, numbers of memory based distributed storage systems have been proposed \cite{memcached, tachyon, ramcloud} to move data back to memory. 
-But most of the DAG frameworks still store shuffle data on disks (e.g., Spark \cite{apachespark}, Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc).
+On the other hand, memory based distributed storage systems have been proposed \cite{memcached, tachyon, ramcloud} to move data back to memory, 
+but most of the DAG frameworks still store shuffle data on disks (e.g., Spark \cite{apachespark}, Hadoop MapReduce \cite{hadoop}, Dryad \cite{dryad}, etc).
 We argue that the memory capacity is large enough to store the short-living shuffle data with cautious management.
 
 \subsubsection{Multi-round Tasks Execution}\label{multi}
@@ -87,12 +87,12 @@ We argue that the memory capacity is large enough to store the short-living shuf
 \marginpar{E7}
 \fi
 Both experience and DAG framework manuals recommend that multi-round execution of each stage will benefit the performance of applications.
-For a cluster with $n$ number of slots, the number of tasks should be $n \times k (k \geq 1)$. 
+For a cluster with $n$ slots, the number of tasks should be $n \times k (k \geq 1)$. 
 For example, Hadoop MapReduce Tutorial \cite{hadooptutorial} suggests that \textit{10-100 maps} per-node and \textit{0.95 or 1.75 $\times$ number of nodes $\times$ number of maximum container reduces} per-node seem to be the right level of parallelism. 
 Spark configuration also recommends $2\text{-}3$ tasks per CPU core \cite{sparkconf} (i.e., $k = 2\text{-}3$).
-Since the shuffle data becomes available as soon as the end of a task's execution. 
-Meanwhile, the network is idle during the map stage (network utilization during map stage in Figure \ref{fig:util}). 
-If the destination host of the shuffle data can be predicted in priori, the property of multi-round can be leveraged to overlap the shuffle read operation.
+Since the shuffle data becomes available as soon as the end of a task's execution 
+and the network is idle during the map stage (network utilization during map stage in Figure \ref{fig:util}), 
+the property of multi-round tasks can be leveraged to optimize the shuffle read operations if the destination host of the shuffle data can be predicted a priori. 
 % There are at least two persistent storage operations for each shuffle data block. At first, Spark will write shuffle data to the persistent storage after map task execution (i.e. \textit{shuffle write} in Figure \ref{fig:util}). During the \textit{shuffle read}, Spark will read shuffle data from remote and local persistent storage, which is the second operation. The persistence of shuffle data was designed for fault tolerance. But we believe it is not necessary for today's cluster. Recall that shuffle data only exist in a short time scale. But the Mean Time To Failure (MTTF) for a server is counted in the scale of year \cite{tachyon}, which is exponential compared with the duration of a shuffle. In addition, the capacity of memory and network has been increasing rapidly in recent years. As a result, numbers of memory based distributed storage system have been proposed \cite{memcached, tachyon, ramcloud}. On the other hand, the size of shuffle data is relatively small. For example, shuffle size of Spark Terasort \cite{spark-tera} is less than 25\% of input data. The data reported in  \cite{makingsense} also shows that the amount of data shuffled is less than input data, by as much as 10\%-20\%. We argue that removing persistent storage and using memory to achieve shuffle fault tolerance is feasible and efficient.
 \ifrevision
 \marginpar{\scriptsize Common}

@@ -3,8 +3,8 @@
 \textbf{Pre-scheduling}: Slow-start from Apache Hadoop MapReduce \cite{hadoop} is a classic approach to handle shuffle overhead. 
 Starfish \cite{starfish} gets sampled data statics for self-tuning system parameters (e.g. slow-start, etc). 
 DynMR \cite{dynmr} dynamically starts reduce tasks in late map stage. 
-All of them left the explicit I/O time in occupied extra slots. 
-Instead, SCache starts shuffle pre-fetching without consuming slots. 
+All of them have the explicit I/O time in occupied slots. 
+SCache instead starts shuffle pre-fetching without consuming slots. 
 iShuffle \cite{ishuffle} decouples shuffle from reducers and designs a centralized shuffle controller. 
 But it can neither handle multiple shuffles nor schedule multiple rounds of reduce tasks. 
 iHadoop \cite{ihadoop} aggressively pre-schedules tasks in multiple successive stages to start fetching shuffle. 
@@ -16,8 +16,8 @@ Different from these works, SCache pre-schedules multiple shuffles without break
 ShuffleWatcher \cite{shufflewatcher} delays shuffle fetching when network is saturated. 
 At the same time, it achieves better data locality. 
 Both Quincy \cite{quincy} and Fair Scheduling \cite{preemptive} can reduce shuffle data by optimizing data locality of map tasks. 
-But all of them can not mitigate explicit I/O in both map and reduce tasks. 
-In addition their optimizations fluctuate under different network performances and data distributions, whereas SCache can provide a stable performance gain by shuffle data pre-fetching and in-memory caching.
+But all of them cannot mitigate explicit I/O in both map and reduce tasks. 
+In addition, their optimizations fluctuate under different network performances and data distributions, whereas SCache can provide a stable performance gain by shuffle data pre-fetching and in-memory caching.
 
 \textbf{Network layer optimization}: Varys \cite{varys} and Aalo \cite{aalo} provide the network layer optimization for shuffle transfer. 
 Though the efforts are limited throughout whole shuffle process, they can be easily applied on SCache to further improve the performance.
