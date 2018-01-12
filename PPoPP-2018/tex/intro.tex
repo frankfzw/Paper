@@ -80,7 +80,7 @@ As a result, even we can effectively resolve the above deficiencies by modifying
 % challenge point by point, inside the problem
 
 Can we efficiently optimize the data shuffling without significantly changing DAG frameworks?
-In this paper, we answer this question in the affirmative with S(huffle)Cache, an open source \footnote{https://github.com/frankfzw/SCache} plug-in system which provides a shuffle-specific optimization for different DAG computing frameworks.
+In this paper, we answer this question in the affirmative with S(huffle)Cache, an open source\footnote{https://github.com/frankfzw/SCache} plug-in system which provides a shuffle-specific optimization for different DAG computing frameworks.
 Specifically, SCache takes over the whole shuffle phase from the underlying framework by providing a cross-framework API for both shuffle write and read.
 SCache's effectiveness lies in the following two key ideas.
 First, SCache decouples the shuffle write and read from both map and reduce tasks.

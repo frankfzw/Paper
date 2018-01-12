@@ -62,7 +62,7 @@ Then we use a recognized shuffle intensive benchmark-Terasort \cite{spark-tera} 
 	\end{minipage}
 	\vspace{-1em}
 \end{figure*}
-In order to prove the performance gain of SCache with a real production workload, we also evaluate Spark TPC-DS \footnote{https://github.com/databricks/spark-sql-perf} and present the overall performance improvement.
+In order to prove the performance gain of SCache with a real production workload, we also evaluate Spark TPC-DS\footnote{https://github.com/databricks/spark-sql-perf} and present the overall performance improvement.
 Finally, we measure the overhead of weighted reservoir sampling. 
 In summary, SCache can decrease ~$89\%$ time of Spark shuffle without introducing extra network transfer. 
 % Furthermore, SCache achieves a ~$75\%$ and ~$50\%$ improvement of reduce stage completion time respectively in simple DAG application and Terasort without introducing extra network traffic. 
@@ -75,7 +75,7 @@ More impressively, the overall completion time of TPC-DS can be improved ~$40\%$
 \fi
 We modified Spark to enable shuffle optimization of SCache as a representative.
 The shuffle configuration of Spark is set to the default \cite{sparkconf}. 
-We run the experiments on a 50-node m4.xlarge cluster on Amazon EC2 \footnote{http://aws.amazon.com/ec2/}. 
+We run the experiments on a 50-node m4.xlarge cluster on Amazon EC2\footnote{http://aws.amazon.com/ec2/}. 
 Each node has 16GB memory and 4 CPUs. The network bandwidth provided by Amazon is insufficient. 
 Our evaluations reveal the bandwidth is only about 300 Mbps (see Figure \ref{fig:util}).
 
@@ -169,7 +169,7 @@ By doing this, Spark minimizes the shuffle data through network.
 At the same time, Figure \ref{fig:terashuffle} reveals that SCache produces exactly same network traffic as Spark. 
 It implies that the heuristic locality swap of SCache can obtain the best locality while balancing the load. 
 \begin{figure*}
-	\includegraphics[width=0.85\textwidth]{fig/tpcds}
+	\includegraphics[width=0.845\textwidth]{fig/tpcds}
 	\caption{TPC-DS Benchmark Evaluation}
 	\label{fig:tpcds}
 	\vspace{-1em}
@@ -216,7 +216,7 @@ Since this evaluation presents the overall job completion time of queries, we be
 	\includegraphics[width=0.6\linewidth]{fig/sampling}
 	\caption{Sampling Overhead}
 	\label{fig:sampling}
-	\vspace{-1em}
+	% \vspace{-1em}
 \end{figure}
 We evaluate the overhead of sampling with different input sizes and numbers of nodes. 
 In Figure \ref{fig:sampling}, the overhead of sampling only grows with the increase of input size on each node, but remains relatively stable when the cluster size scales up.

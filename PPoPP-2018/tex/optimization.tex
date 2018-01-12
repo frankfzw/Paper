@@ -64,12 +64,12 @@ That is, the task-node mapping is established a priori, and then it is enforced 
 % \begin{figure}
 \subsubsection{Problem of Random Mapping}\label{randomassign}
 The simplest way of pre-scheduling is mapping tasks to nodes randomly and evenly. 
-In order to evaluate the effectiveness of random mapping, we use traces from OpenCloud \footnote{\label{fn:trace}http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html} for the simulation.
+In order to evaluate the effectiveness of random mapping, we use traces from OpenCloud\footnote{\label{fn:trace}http://ftp.pdl.cmu.edu/pub/datasets/hla/dataset.html} for the simulation.
 Note that most of the traces from OpenCloud are shuffle-light workload as shown in Figure \ref{fig:cdf}. 
 The average shuffle read time is 3.2\% of total reduce completion time.
 \begin{figure}
 	\centering
-	\includegraphics[width=0.6\linewidth]{fig/sim}
+	\includegraphics[width=0.66\linewidth]{fig/sim}
 	\caption{Stage Completion Time Improvement of OpenCloud Trace}
 	\label{fig:sim}
 	\vspace{-1em}
@@ -89,17 +89,17 @@ In addition, randomly assigned tasks also ignore the data locality between shuff
 \end{figure}
 \begin{figure*}
 	\centering
-	\begin{subfigure}[b]{0.32\linewidth}
+	\begin{subfigure}[b]{0.31\linewidth}
 		\includegraphics[width=\linewidth]{fig/hash_pre}
 		\caption{Linear Regression Prediction of Hash Partitioner}
 		\label{fig:hash_pre}
 	\end{subfigure}
-	\begin{subfigure}[b]{0.32\linewidth}
+	\begin{subfigure}[b]{0.31\linewidth}
 		\includegraphics[width=\linewidth]{fig/range_pre_sample}
 		\caption{Linear Regression and Sampling Prediction of Range Partitioner}
 		\label{fig:range_pre_sample}
 	\end{subfigure}
-	\begin{subfigure}[b]{0.32\linewidth}
+	\begin{subfigure}[b]{0.31\linewidth}
 		\includegraphics[width=\linewidth]{fig/prediction_relative_error}
 		\caption{Prediction Relative Error of Range Partitioner}
 		\label{fig:prediction_relative_error}
@@ -211,7 +211,8 @@ The $SWAP\_TASKS$ will be triggered when the $host\_id$ of a task does not equal
 Based on the $prob$, the normalized probability $norm$ is calculated as a bound of performance degradation. 
 % We set maximum $upper\_bound$ of performance degradation equals to 10\% that can be traded for locality (in extreme skew scenarios).
 Inside the $SWAP\_TASKS$, tasks will be selected and swapped without exceeding the $upper\_bound$. 
-\begin{minipage}{\columnwidth}
+\noindent
+\begin{minipage}{0.95\columnwidth}
 \begin{algorithm}[H]
 \caption{Heuristic MinHeap Scheduling for Single Shuffle}
 \label{hminheap}
@@ -286,7 +287,8 @@ After scheduling, if the new $assigned\_id$ of a reduce task did not equal the o
 This re-shuffle is rare since the previous shuffle data contributes a huge composition (i.e., high $prob$) after the accumulation, 
 which leads to a higher probability of tasks swap in $SWAP\_TASKS$. 
 
-\begin{minipage}{\columnwidth}
+\noindent
+\begin{minipage}{0.95\columnwidth}
 \begin{algorithm}[H]
 \caption{Accumulated Heuristic Scheduling for Multi-Shuffles}
 \label{mhminheap}
